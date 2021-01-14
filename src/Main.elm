@@ -1,7 +1,9 @@
 port module Main exposing (main)
 
+import Api
 import Browser
 import Browser.Navigation as Nav
+import Game.Game
 import Html.Styled exposing (Html, div, text, toUnstyled)
 import Page
 import Page.Home as Home
