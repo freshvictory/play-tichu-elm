@@ -1,9 +1,10 @@
 module Page.Game exposing (Model, Msg, init, update, view)
 
-import Game.Game exposing (GameDeck, Location(..), PlayerLocation(..), playerHoldings)
+import Css
+import Game.Game exposing (Card, Deck, Game, GameDeck, Location(..), PlayerLocation(..), playerHoldings)
 import Game.Tichu exposing (TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit, tichuDeck, tichuGame)
-import Html.Attributes exposing (list)
 import Html.Styled as H exposing (Html)
+import Html.Styled.Attributes exposing (css, list)
 import Html.Styled.Events as E
 import Page
 import Random
@@ -13,19 +14,19 @@ import Random
 -- MODEL
 
 
-type alias DealtDeck =
-    GameDeck TichuSuit TichuPlayer
+type alias DealtDeck suit player =
+    GameDeck suit player
 
 
-type CurrentDeck
+type CurrentDeck suit player
     = Undealt
-    | Dealt DealtDeck
+    | Dealt (DealtDeck suit player)
 
 
 type alias Model =
     { gameId : String
     , game : TichuGame
-    , deck : CurrentDeck
+    , deck : CurrentDeck TichuSuit TichuPlayer
     }
 
 
@@ -62,7 +63,7 @@ shuffleDeck model =
     Random.generate DeckShuffled model.game.shuffledDeckGenerator
 
 
-dealDeck : TichuGame -> TichuDeck -> DealtDeck
+dealDeck : Game suit player -> Deck suit -> DealtDeck suit player
 dealDeck game deck =
     game.deal deck
 
@@ -100,7 +101,7 @@ viewGame model =
         ]
 
 
-viewPlayer : DealtDeck -> TichuPlayer -> Html Msg
+viewPlayer : DealtDeck suit player -> player -> Html Msg
 viewPlayer deck player =
     let
         holdings =
@@ -114,7 +115,7 @@ viewPlayer deck player =
                 (\card ->
                     H.li
                         []
-                        [ H.text card.definition.displayName
+                        [ viewCard card.definition
                         ]
                 )
                 holdings
@@ -122,9 +123,18 @@ viewPlayer deck player =
         ]
 
 
-viewCard : TichuCard -> Html Msg
+viewCard : Card s -> Html Msg
 viewCard card =
+    let
+        style =
+            [ Css.width (Css.px 100)
+            , Css.height (Css.px 150)
+            , Css.border3 (Css.px 1) Css.solid (Css.hex "#000")
+            , Css.borderRadius (Css.px 5)
+            , Css.backgroundColor (Css.hex "#fff")
+            ]
+    in
     H.div
-        []
+        [ css style ]
         [ H.text card.displayName
         ]
