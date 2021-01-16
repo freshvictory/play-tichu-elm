@@ -106,9 +106,6 @@ deal spec players deck =
         numberOfPlayers =
             List.length players
 
-        playerMap =
-            List.concat (List.repeat (numberOfCards // numberOfPlayers) players)
-
         locations =
             List.concatMap
                 (\( location, count ) ->
@@ -117,18 +114,34 @@ deal spec players deck =
                 spec
 
         locationMap =
-            List.concat (List.repeat (numberOfCards // List.length locations) locations)
+            List.concat (List.repeat numberOfPlayers locations)
+
+        playerMap =
+            List.concat (List.repeat (List.length locations) players)
 
         deckToDealToPlayer =
             List.map3 (\card location player -> ( card, location, player )) deck locationMap playerMap
+
+        deckRemaining =
+            List.drop (List.length locationMap) deck
     in
-    List.map
-        (\( card, location, player ) ->
-            { definition = card
-            , location = location player
-            }
+    List.append
+        (List.map
+            (\( card, location, player ) ->
+                { definition = card
+                , location = location player
+                }
+            )
+            deckToDealToPlayer
         )
-        deckToDealToPlayer
+        (List.map
+            (\card ->
+                { definition = card
+                , location = Deck
+                }
+            )
+            deckRemaining
+        )
 
 
 shuffle : Deck suit -> Random.Generator (Deck suit)

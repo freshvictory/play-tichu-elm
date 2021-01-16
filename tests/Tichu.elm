@@ -1,7 +1,8 @@
 module Tichu exposing (..)
 
 import Expect
-import Game.Tichu exposing (TichuLocation(..), TichuPlayer(..), tichuDealSpecification, tichuDeck, tichuGame)
+import Game.Game exposing (Location(..), PlayerLocation(..), deal)
+import Game.Tichu exposing (TichuPlayer(..), tichuDealSpecification, tichuDeck, tichuGame)
 import Test exposing (..)
 
 
@@ -50,4 +51,19 @@ tichuDealing =
                             )
                             tichuDealSpecification
                         )
+        , test "Shorter deals are split between players and the deck" <|
+            \_ ->
+                Expect.equal
+                    { players = 32, deck = 24 }
+                    (List.foldl
+                        (\card counts ->
+                            if card.location == Deck then
+                                { counts | deck = counts.deck + 1 }
+
+                            else
+                                { counts | players = counts.players + 1 }
+                        )
+                        { players = 0, deck = 0 }
+                        (deal [ ( PlayerLocation Hand, 8 ) ] [ North, South, East, West ] tichuDeck)
+                    )
         ]
