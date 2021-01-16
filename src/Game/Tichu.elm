@@ -1,6 +1,6 @@
-module Game.Tichu exposing (TichuLocation(..), TichuPlayer(..), TichuSuit(..), tichuDeck, tichuGame)
+module Game.Tichu exposing (TichuDeck, TichuGame, TichuLocation(..), TichuPlayer(..), TichuSuit(..), tichuDealSpecification, tichuDeck, tichuGame)
 
-import Game.Game as Game
+import Game.Game as Game exposing (Deal)
 
 
 type TichuSuit
@@ -32,13 +32,6 @@ type Combination
     | Bomb Bomb
 
 
-type alias PlayedCombination =
-    { id : String
-    , player : TichuPlayer
-    , type_ : Combination
-    }
-
-
 type TichuLocation
     = Table String
     | Taken TichuPlayer
@@ -47,12 +40,25 @@ type TichuLocation
     | Pass TichuPlayer TichuPlayer
 
 
-tichuGame : Game.Game TichuSuit TichuPlayer TichuLocation
+type alias TichuGame =
+    Game.Game TichuSuit TichuPlayer TichuLocation
+
+
+type alias TichuDeck =
+    Game.Deck TichuSuit
+
+
+tichuDealSpecification : Deal TichuPlayer TichuLocation
+tichuDealSpecification =
+    [ ( FirstEight, 8 ), ( SecondSix, 6 ) ]
+
+
+tichuGame : TichuGame
 tichuGame =
     Game.buildGame
         { deck = tichuDeck
         , players = [ North, East, South, West ]
-        , dealSpecification = [ ( FirstEight, 8 ), ( SecondSix, 6 ) ]
+        , dealSpecification = tichuDealSpecification
         }
 
 

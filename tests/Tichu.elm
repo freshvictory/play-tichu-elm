@@ -1,7 +1,7 @@
 module Tichu exposing (..)
 
 import Expect
-import Game.Tichu exposing (TichuLocation(..), TichuPlayer(..), tichuDeck, tichuGame)
+import Game.Tichu exposing (TichuLocation(..), TichuPlayer(..), tichuDealSpecification, tichuDeck, tichuGame)
 import Test exposing (..)
 
 
@@ -22,56 +22,32 @@ tichuDealing =
                 in
                 deal
                     |> Expect.all
-                        [ \d -> Expect.equal
-                            { north = 8, south = 8, east = 8, west = 8 }
-                            (List.foldl
-                                (\card counts ->
-                                    case card.location of
-                                        FirstEight p ->
-                                            case p of
-                                                North ->
+                        (List.map
+                            (\( location, count ) ->
+                                \d ->
+                                    Expect.equal
+                                        { north = count, south = count, east = count, west = count }
+                                        (List.foldl
+                                            (\card counts ->
+                                                if card.location == location North then
                                                     { counts | north = counts.north + 1 }
 
-                                                South ->
+                                                else if card.location == location South then
                                                     { counts | south = counts.south + 1 }
 
-                                                East ->
+                                                else if card.location == location East then
                                                     { counts | east = counts.east + 1 }
 
-                                                West ->
+                                                else if card.location == location West then
                                                     { counts | west = counts.west + 1 }
 
-                                        _ ->
-                                            counts
-                                )
-                                { north = 0, south = 0, east = 0, west = 0 }
-                                d
+                                                else
+                                                    counts
+                                            )
+                                            { north = 0, south = 0, east = 0, west = 0 }
+                                            d
+                                        )
                             )
-                        , \d -> Expect.equal
-                            { north = 6, south = 6, east = 6, west = 6 }
-                            (List.foldl
-                                (\card counts ->
-                                    case card.location of
-                                        SecondSix p ->
-                                            case p of
-                                                North ->
-                                                    { counts | north = counts.north + 1 }
-
-                                                South ->
-                                                    { counts | south = counts.south + 1 }
-
-                                                East ->
-                                                    { counts | east = counts.east + 1 }
-
-                                                West ->
-                                                    { counts | west = counts.west + 1 }
-
-                                        _ ->
-                                            counts
-                                )
-                                { north = 0, south = 0, east = 0, west = 0 }
-                                d
-                            )
-                        ]
-                
+                            tichuDealSpecification
+                        )
         ]

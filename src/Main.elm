@@ -6,6 +6,7 @@ import Browser.Navigation as Nav
 import Game.Game
 import Html.Styled exposing (Html, div, text, toUnstyled)
 import Page
+import Page.Game as Game
 import Page.Home as Home
 import Url
 import Url.Parser as Parser
@@ -15,6 +16,7 @@ import Url.Parser as Parser
         , oneOf
         , s
         , top
+        , (</>)
         )
 
 
@@ -50,6 +52,7 @@ type alias Model =
 type Page
     = NotFound
     | Home Home.Model
+    | Game Game.Model
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -65,6 +68,7 @@ type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | HomeMsg Home.Msg
+    | GameMsg Game.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -98,6 +102,11 @@ routeHome model ( home, m ) =
     ( { model | page = Home home }, Cmd.map HomeMsg m )
 
 
+routeGame : Model -> ( Game.Model, Cmd Game.Msg ) -> ( Model, Cmd Msg )
+routeGame model ( game, m ) =
+    ( { model | page = Game game }, Cmd.map GameMsg m )
+
+
 
 ---- VIEW ----
 
@@ -115,6 +124,9 @@ view model =
         Home home ->
             Page.view HomeMsg (Home.view home)
 
+        Game game ->
+            Page.view GameMsg (Game.view game)
+
 
 
 -- ROUTER
@@ -129,6 +141,8 @@ routeToUrl url model =
                     (routeHome model Home.init)
                 , route (s "index.html")
                     (routeHome model Home.init)
+                , route ((s "game") </> Parser.string)
+                    (\gameId -> (routeGame model (Game.init gameId)))
                 ]
     in
     case Parser.parse parser url of
