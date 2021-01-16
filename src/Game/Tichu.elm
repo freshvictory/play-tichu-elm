@@ -1,6 +1,6 @@
 module Game.Tichu exposing (TichuDeck, TichuGame, TichuLocation(..), TichuPlayer(..), TichuSuit(..), tichuDealSpecification, tichuDeck, tichuGame)
 
-import Game.Game as Game exposing (Deal)
+import Game.Game as Game exposing (CardState(..), Deal, Location(..), PlayerLocation(..))
 
 
 type TichuSuit
@@ -41,16 +41,16 @@ type TichuLocation
 
 
 type alias TichuGame =
-    Game.Game TichuSuit TichuPlayer TichuLocation
+    Game.Game TichuSuit TichuPlayer
 
 
 type alias TichuDeck =
     Game.Deck TichuSuit
 
 
-tichuDealSpecification : Deal TichuPlayer TichuLocation
+tichuDealSpecification : Deal TichuPlayer
 tichuDealSpecification =
-    [ ( FirstEight, 8 ), ( SecondSix, 6 ) ]
+    [ ( PlayerLocation Hand, 8 ), ( PlayerLocation (InFront FaceDown), 6 ) ]
 
 
 tichuGame : TichuGame

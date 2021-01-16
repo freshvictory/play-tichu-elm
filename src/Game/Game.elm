@@ -14,39 +14,57 @@ type alias Card s =
     }
 
 
+type CardState
+    = FaceUp
+    | FaceDown
+
+
+type PlayerLocation player
+    = Hand
+    | InFront CardState
+    | Taken
+    | Table
+    | PassedFrom player
+
+
+type Location player
+    = Deck
+    | PlayerLocation (PlayerLocation player) player
+
+
 type alias Deck s =
     List (Card s)
 
 
-type alias GameDeck suit l =
-    List (CardInPlay (Card suit) l)
+type alias GameDeck suit player =
+    List (CardInPlay (Card suit) player)
 
 
-type alias CardInPlay c l =
+type alias CardInPlay c player =
     { definition : c
-    , location : l
+    , location : Location player
     }
 
 
-type alias Deal player location =
-    List ( player -> location, Int )
+type alias Deal player =
+    List ( player -> Location player, Int )
 
 
-type alias GameDefinition suit player location =
+type alias GameDefinition suit player =
     { deck : Deck suit
     , players : List player
-    , dealSpecification : Deal player location
+    , dealSpecification : Deal player
     }
 
 
-type alias Game suit player location =
+type alias Game suit player =
     { players : List player
-    , deal : Deck suit -> GameDeck suit location
+    , deal : Deck suit -> GameDeck suit player
     , shuffledDeckGenerator : Random.Generator (Deck suit)
     }
 
 
-buildGame : GameDefinition suit player location -> Game suit player location
+buildGame : GameDefinition suit player -> Game suit player
 buildGame definition =
     { players = definition.players
     , deal = deal definition.dealSpecification definition.players
@@ -54,7 +72,7 @@ buildGame definition =
     }
 
 
-deal : Deal player location -> List player -> Deck suit -> GameDeck suit location
+deal : Deal player -> List player -> Deck suit -> GameDeck suit player
 deal spec players deck =
     let
         numberOfCards =

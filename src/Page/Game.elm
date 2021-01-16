@@ -76,7 +76,7 @@ viewHands model =
             (\card ->
                 H.li
                     []
-                    [ H.text ("Card " ++ card.name)
+                    [ H.text ("Card " ++ card.displayName)
                     ]
             )
             model.deck
