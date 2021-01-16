@@ -1,6 +1,6 @@
 module Page.Game exposing (Model, Msg, init, update, view)
 
-import Css exposing (hex, px, rem)
+import Css exposing (hex, pct, px, rem)
 import Game.Game exposing (Card, CardState(..), Deck, Game, GameDeck, Location(..), PlayerHolding, PlayerLocation(..), playerHoldings)
 import Game.Tichu exposing (PlayerAction(..), TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit, tichuDeck, tichuGame, tichuPlay)
 import Html.Styled as H exposing (Html)
@@ -84,7 +84,7 @@ dealDeck game deck =
 view : Model -> Page.Details Msg
 view model =
     { title = "Tichu Game"
-    , attrs = []
+    , attrs = [ css [ Css.height (pct 100) ] ]
     , body =
         [ viewGame model
         ]
@@ -93,8 +93,16 @@ view model =
 
 viewGame : Model -> Html Msg
 viewGame model =
+    let
+        style =
+            { game =
+                [ Css.property "background-color" "var(--c-table)"
+                , Css.height (pct 100)
+                ]
+            }
+    in
     H.div
-        []
+        [ css style.game ]
         [ H.text ("Hi, it's tichu!" ++ model.gameId)
         , H.button
             [ E.onClick Shuffle
@@ -150,8 +158,7 @@ viewPlayerFront : player -> ( List (Card suit), List (Card suit) ) -> Html Msg
 viewPlayerFront player ( faceUp, faceDown ) =
     let
         style =
-            { faceDown =
-                [ Css.displayFlex ]
+            { faceDown = List.append sharedStyle.cardList []
             }
     in
     H.div
@@ -161,7 +168,7 @@ viewPlayerFront player ( faceUp, faceDown ) =
             (List.map
                 (\card ->
                     H.li
-                        []
+                        [ css sharedStyle.cardListItem ]
                         [ viewFaceDownCard card
                         ]
                 )
@@ -177,10 +184,8 @@ viewHand player hand =
             List.sortBy (\c -> c.definition.rank) hand
 
         style =
-            { hand =
-                [ Css.displayFlex
-                , Css.flexWrap Css.wrap
-                ]
+            { hand = List.append sharedStyle.cardList []
+            , cardContainer = List.append sharedStyle.cardListItem []
             }
     in
     H.div
@@ -190,7 +195,7 @@ viewHand player hand =
             (List.map
                 (\card ->
                     H.li
-                        []
+                        [ css style.cardContainer ]
                         [ viewCard card.definition
                         ]
                 )
@@ -199,33 +204,43 @@ viewHand player hand =
         ]
 
 
-viewBaseCard : List (Html Msg) -> Html Msg
-viewBaseCard contents =
-    let
-        style =
-            [ Css.width (px 100)
-            , Css.height (px 150)
-            , Css.border3 (px 1) Css.solid (hex "#000")
-            , Css.borderRadius (px 5)
-            , Css.backgroundColor (hex "#fff")
-            , Css.boxShadow4 (px 2) (px 2) (px 5) (hex "#ccc")
-            , Css.hover
-                [ Css.borderColor (hex "5ba3dc")
-                ]
-            ]
-    in
-    H.div
-        [ css style ]
-        contents
-
-
 viewCard : Card s -> Html Msg
 viewCard card =
-    viewBaseCard
+    H.div
+        [ css sharedStyle.card ]
         [ H.text card.displayName
         ]
 
 
 viewFaceDownCard : Card s -> Html Msg
 viewFaceDownCard card =
-    viewBaseCard []
+    H.div
+        [ css sharedStyle.card ]
+        []
+
+
+sharedStyle =
+    let
+        pxOverlap =
+            50
+    in
+    { card =
+        [ Css.width (px 100)
+        , Css.height (px 150)
+        , Css.border3 (px 1) Css.solid (hex "#000")
+        , Css.borderRadius (px 5)
+        , Css.backgroundColor (hex "#fff")
+        , Css.boxShadow4 (px 2) (px 2) (px 5) (hex "#ccc")
+        , Css.hover
+            [ Css.borderColor (hex "5ba3dc")
+            ]
+        ]
+    , cardList =
+        [ Css.displayFlex
+        , Css.flexWrap Css.wrap
+        , Css.justifyContent Css.center
+        , Css.paddingRight (px pxOverlap)
+        ]
+    , cardListItem =
+        [ Css.marginLeft (px -pxOverlap) ]
+    }

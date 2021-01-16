@@ -1,6 +1,7 @@
 module Page exposing (Details, view)
 
 import Browser
+import Css exposing (pct)
 import Html.Styled
     exposing
         ( Attribute
@@ -12,7 +13,8 @@ import Html.Styled
         )
 import Html.Styled.Attributes
     exposing
-        ( id
+        ( css
+        , id
         )
 
 
@@ -42,6 +44,9 @@ viewApp : (a -> msg) -> List (Attribute a) -> List (Html a) -> Html msg
 viewApp toMsg attrs body =
     div
         [ id "top"
+        , css
+            [ Css.height (pct 100)
+            ]
         ]
         [ map toMsg (viewBody attrs body)
         ]
