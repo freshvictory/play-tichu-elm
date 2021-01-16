@@ -24,7 +24,7 @@ type PlayerLocation player
     | InFront CardState
     | Taken
     | Table
-    | PassedFrom player
+    | PassingTo player
 
 
 type Location player
@@ -62,6 +62,31 @@ type alias Game suit player =
     , deal : Deck suit -> GameDeck suit player
     , shuffledDeckGenerator : Random.Generator (Deck suit)
     }
+
+
+type alias PlayerHoldings suit player =
+    List
+        { definition : Card suit
+        , location : PlayerLocation player
+        }
+
+
+playerHoldings : GameDeck suit player -> player -> PlayerHoldings suit player
+playerHoldings deck player =
+    List.filterMap
+        (\card ->
+            case card.location of
+                PlayerLocation location p ->
+                    if p == player then
+                        Just { definition = card.definition, location = location }
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+        )
+        deck
 
 
 buildGame : GameDefinition suit player -> Game suit player

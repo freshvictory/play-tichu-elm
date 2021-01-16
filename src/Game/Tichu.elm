@@ -1,6 +1,6 @@
-module Game.Tichu exposing (TichuDeck, TichuGame, TichuLocation(..), TichuPlayer(..), TichuSuit(..), tichuDealSpecification, tichuDeck, tichuGame)
+module Game.Tichu exposing (TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit(..), tichuDealSpecification, tichuDeck, tichuGame)
 
-import Game.Game as Game exposing (CardState(..), Deal, Location(..), PlayerLocation(..))
+import Game.Game as Game exposing (Card, CardState(..), Deal, Location(..), PlayerLocation(..))
 
 
 type TichuSuit
@@ -32,12 +32,8 @@ type Combination
     | Bomb Bomb
 
 
-type TichuLocation
-    = Table String
-    | Taken TichuPlayer
-    | FirstEight TichuPlayer
-    | SecondSix TichuPlayer
-    | Pass TichuPlayer TichuPlayer
+type alias TichuCard =
+    Card TichuSuit
 
 
 type alias TichuGame =

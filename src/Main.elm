@@ -11,12 +11,12 @@ import Page.Home as Home
 import Url
 import Url.Parser as Parser
     exposing
-        ( Parser
+        ( (</>)
+        , Parser
         , map
         , oneOf
         , s
         , top
-        , (</>)
         )
 
 
@@ -93,6 +93,9 @@ update msg model =
         ( HomeMsg m, Home h ) ->
             routeHome model (Home.update m h)
 
+        ( GameMsg m, Game g ) ->
+            routeGame model (Game.update m g)
+
         _ ->
             ( model, Cmd.none )
 
@@ -141,8 +144,8 @@ routeToUrl url model =
                     (routeHome model Home.init)
                 , route (s "index.html")
                     (routeHome model Home.init)
-                , route ((s "game") </> Parser.string)
-                    (\gameId -> (routeGame model (Game.init gameId)))
+                , route (s "game" </> Parser.string)
+                    (\gameId -> routeGame model (Game.init gameId))
                 ]
     in
     case Parser.parse parser url of

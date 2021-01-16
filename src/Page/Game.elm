@@ -1,26 +1,37 @@
 module Page.Game exposing (Model, Msg, init, update, view)
 
-import Game.Tichu exposing (TichuDeck, TichuGame, tichuGame)
+import Game.Game exposing (GameDeck, Location(..), PlayerLocation(..), playerHoldings)
+import Game.Tichu exposing (TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit, tichuDeck, tichuGame)
+import Html.Attributes exposing (list)
 import Html.Styled as H exposing (Html)
+import Html.Styled.Events as E
 import Page
 import Random
-import Game.Tichu exposing (tichuDeck)
 
 
 
 -- MODEL
 
 
+type alias DealtDeck =
+    GameDeck TichuSuit TichuPlayer
+
+
+type CurrentDeck
+    = Undealt
+    | Dealt DealtDeck
+
+
 type alias Model =
     { gameId : String
     , game : TichuGame
-    , deck : TichuDeck
+    , deck : CurrentDeck
     }
 
 
 init : String -> ( Model, Cmd Msg )
 init gameId =
-    ( { gameId = gameId, game = tichuGame, deck = tichuDeck }, Cmd.none )
+    ( { gameId = gameId, game = tichuGame, deck = Undealt }, Cmd.none )
 
 
 
@@ -40,10 +51,20 @@ update msg model =
             ( model, Cmd.none )
 
         Shuffle ->
-            ( model, Random.generate DeckShuffled model.game.shuffledDeckGenerator)
+            ( model, shuffleDeck model )
 
         DeckShuffled deck ->
-            ( { model | deck = deck }, Cmd.none )
+            ( { model | deck = Dealt (dealDeck model.game deck) }, Cmd.none )
+
+
+shuffleDeck : Model -> Cmd Msg
+shuffleDeck model =
+    Random.generate DeckShuffled model.game.shuffledDeckGenerator
+
+
+dealDeck : TichuGame -> TichuDeck -> DealtDeck
+dealDeck game deck =
+    game.deal deck
 
 
 
@@ -65,20 +86,45 @@ viewGame model =
     H.div
         []
         [ H.text ("Hi, it's tichu!" ++ model.gameId)
+        , H.button
+            [ E.onClick Shuffle
+            ]
+            [ H.text "Shuffle!"
+            ]
+        , case model.deck of
+            Dealt d ->
+                viewPlayer d North
+
+            Undealt ->
+                H.text ""
         ]
 
 
-viewHands : Model -> Html Msg
-viewHands model =
-    H.ol
+viewPlayer : DealtDeck -> TichuPlayer -> Html Msg
+viewPlayer deck player =
+    let
+        holdings =
+            playerHoldings deck player
+    in
+    H.div
         []
-        ( List.map
-            (\card ->
-                H.li
-                    []
-                    [ H.text ("Card " ++ card.displayName)
-                    ]
+        [ H.ol
+            []
+            (List.map
+                (\card ->
+                    H.li
+                        []
+                        [ H.text card.definition.displayName
+                        ]
+                )
+                holdings
             )
-            model.deck
-        )
-    
+        ]
+
+
+viewCard : TichuCard -> Html Msg
+viewCard card =
+    H.div
+        []
+        [ H.text card.displayName
+        ]
