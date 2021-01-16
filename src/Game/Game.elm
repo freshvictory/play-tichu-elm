@@ -64,14 +64,13 @@ type alias Game suit player =
     }
 
 
-type alias PlayerHoldings suit player =
-    List
-        { definition : Card suit
-        , location : PlayerLocation player
-        }
+type alias PlayerHolding suit player =
+    { definition : Card suit
+    , location : PlayerLocation player
+    }
 
 
-playerHoldings : GameDeck suit player -> player -> PlayerHoldings suit player
+playerHoldings : GameDeck suit player -> player -> List (PlayerHolding suit player)
 playerHoldings deck player =
     List.filterMap
         (\card ->
