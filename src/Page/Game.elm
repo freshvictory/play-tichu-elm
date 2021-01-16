@@ -2,7 +2,7 @@ module Page.Game exposing (Model, Msg, init, update, view)
 
 import Css exposing (hex, px, rem)
 import Game.Game exposing (Card, CardState(..), Deck, Game, GameDeck, Location(..), PlayerHolding, PlayerLocation(..), playerHoldings)
-import Game.Tichu exposing (TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit, tichuDeck, tichuGame)
+import Game.Tichu exposing (PlayerAction(..), TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit, tichuDeck, tichuGame, tichuPlay)
 import Html.Styled as H exposing (Html)
 import Html.Styled.Attributes exposing (css, list)
 import Html.Styled.Events as E
@@ -43,6 +43,7 @@ type Msg
     = NoOp
     | Shuffle
     | DeckShuffled TichuDeck
+    | TichuPlay PlayerAction
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -56,6 +57,14 @@ update msg model =
 
         DeckShuffled deck ->
             ( { model | deck = Dealt (dealDeck model.game deck) }, Cmd.none )
+
+        TichuPlay play ->
+            case model.deck of
+                Undealt ->
+                    ( model, Cmd.none )
+
+                Dealt deck ->
+                    ( { model | deck = Dealt (tichuPlay play deck) }, Cmd.none )
 
 
 shuffleDeck : Model -> Cmd Msg
@@ -92,6 +101,10 @@ viewGame model =
             ]
             [ H.text "Shuffle!"
             ]
+        , H.button
+            [ E.onClick (TichuPlay (PickUp North))
+            ]
+            [ H.text "pick up" ]
         , case model.deck of
             Dealt d ->
                 viewPlayer d North
@@ -166,6 +179,7 @@ viewHand player hand =
         style =
             { hand =
                 [ Css.displayFlex
+                , Css.flexWrap Css.wrap
                 ]
             }
     in

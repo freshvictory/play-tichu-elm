@@ -1,6 +1,6 @@
-module Game.Tichu exposing (TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit(..), tichuDealSpecification, tichuDeck, tichuGame)
+module Game.Tichu exposing (..)
 
-import Game.Game as Game exposing (Card, CardState(..), Deal, Location(..), PlayerLocation(..))
+import Game.Game as Game exposing (Card, CardState(..), Deal, Location(..), PlayerLocation(..), moveCards)
 
 
 type TichuSuit
@@ -32,6 +32,12 @@ type Combination
     | Bomb Bomb
 
 
+type PlayerAction
+    = Pass TichuPlayer TichuCard TichuPlayer
+    | PickUp TichuPlayer
+    | Play TichuPlayer Combination
+
+
 type alias TichuCard =
     Card TichuSuit
 
@@ -42,6 +48,10 @@ type alias TichuGame =
 
 type alias TichuDeck =
     Game.Deck TichuSuit
+
+
+type alias TichuGameDeck =
+    Game.GameDeck TichuSuit TichuPlayer
 
 
 tichuDealSpecification : Deal TichuPlayer
@@ -61,6 +71,21 @@ tichuGame =
 tichuPlayers : List TichuPlayer
 tichuPlayers =
     [ North, East, South, West ]
+
+
+tichuPlay : PlayerAction -> TichuGameDeck -> TichuGameDeck
+tichuPlay action deck =
+    case action of
+        PickUp player ->
+            moveCards
+                (\card ->
+                    card.location == PlayerLocation (InFront FaceDown) player
+                )
+                (PlayerLocation Hand player)
+                deck
+
+        _ ->
+            deck
 
 
 tichuDeck : Game.Deck TichuSuit

@@ -64,6 +64,19 @@ type alias Game suit player =
     }
 
 
+moveCards : (CardInPlay (Card suit) player -> Bool) -> Location player -> GameDeck suit player -> GameDeck suit player
+moveCards predicate newLocation deck =
+    List.map
+        (\card ->
+            if predicate card then
+                { card | location = newLocation }
+
+            else
+                card
+        )
+        deck
+
+
 type alias PlayerHolding suit player =
     { definition : Card suit
     , location : PlayerLocation player
