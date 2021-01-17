@@ -2,8 +2,8 @@ module Page.Game exposing (Model, Msg, init, update, view)
 
 import Css exposing (hex, pct, px, rem)
 import Game.Game exposing (Card, CardState(..), Deck, Game, GameDeck, Location(..), PlayerHolding, PlayerLocation(..), playerHoldings)
-import Game.Tichu exposing (PlayerAction(..), TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit, tichuDeck, tichuGame, tichuPlay)
-import Html.Styled as H exposing (Html)
+import Game.Tichu exposing (Combination(..), PlayerAction(..), TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit, tichuDeck, tichuGame, tichuPlay, tichuPlayers)
+import Html.Styled as H exposing (Html, i)
 import Html.Styled.Attributes exposing (css, list)
 import Html.Styled.Events as E
 import Page
@@ -23,16 +23,36 @@ type CurrentDeck suit player
     | Dealt (DealtDeck suit player)
 
 
+type alias GamePlayers player =
+    { id : String
+    , name : String
+    , player : player
+    }
+
+
 type alias Model =
     { gameId : String
     , game : TichuGame
     , deck : CurrentDeck TichuSuit TichuPlayer
+    , currentPlayers : List (GamePlayers TichuPlayer)
     }
+
+
+currentPlayers : List (GamePlayers TichuPlayer)
+currentPlayers =
+    List.indexedMap
+        (\i p ->
+            { id = String.fromInt i
+            , name = String.fromInt i
+            , player = p
+            }
+        )
+        tichuPlayers
 
 
 init : String -> ( Model, Cmd Msg )
 init gameId =
-    ( { gameId = gameId, game = tichuGame, deck = Undealt }, Cmd.none )
+    ( { gameId = gameId, game = tichuGame, deck = Undealt, currentPlayers = currentPlayers }, Cmd.none )
 
 
 
@@ -115,15 +135,60 @@ viewGame model =
             [ H.text "pick up" ]
         , case model.deck of
             Dealt d ->
-                viewPlayer d North
+                viewTable d model.currentPlayers (Just North)
 
             Undealt ->
                 H.text ""
         ]
 
 
-viewPlayer : DealtDeck suit player -> player -> Html Msg
-viewPlayer deck player =
+viewTable : DealtDeck TichuSuit TichuPlayer -> List (GamePlayers TichuPlayer) -> Maybe TichuPlayer -> Html Msg
+viewTable deck players currentPlayer =
+    H.div
+        []
+        [ viewCardsInPlay deck players
+        , case currentPlayer of
+            Just p ->
+                viewCurrentPlayer deck p
+
+            Nothing ->
+                H.text ""
+        ]
+
+
+viewCardsInPlay : DealtDeck TichuSuit TichuPlayer -> List (GamePlayers TichuPlayer) -> Html Msg
+viewCardsInPlay deck players =
+    let
+        cardsOnTable =
+            List.filter
+                (\card ->
+                    case card.location of
+                        PlayerLocation Table _ ->
+                            True
+
+                        _ ->
+                            False
+                )
+                deck
+    in
+    H.div
+        []
+        [ H.ol
+            [ css sharedStyle.cardList ]
+            (List.map
+                (\card ->
+                    H.li
+                        [ css sharedStyle.cardListItem ]
+                        [ viewCard card.definition
+                        ]
+                )
+                cardsOnTable
+            )
+        ]
+
+
+viewCurrentPlayer : DealtDeck TichuSuit TichuPlayer -> TichuPlayer -> Html Msg
+viewCurrentPlayer deck player =
     let
         holdings =
             playerHoldings deck player
@@ -151,20 +216,19 @@ viewPlayer deck player =
         []
         [ viewPlayerFront player ( faceUp, faceDown )
         , viewHand player hand
+        , H.button
+            [ E.onClick (TichuPlay (Play player (Straight (List.map .definition hand))))
+            ]
+            [ H.text "Play" ]
         ]
 
 
 viewPlayerFront : player -> ( List (Card suit), List (Card suit) ) -> Html Msg
 viewPlayerFront player ( faceUp, faceDown ) =
-    let
-        style =
-            { faceDown = List.append sharedStyle.cardList []
-            }
-    in
     H.div
         []
         [ H.ol
-            [ css style.faceDown ]
+            [ css sharedStyle.cardList ]
             (List.map
                 (\card ->
                     H.li
@@ -230,17 +294,17 @@ sharedStyle =
         , Css.border3 (px 1) Css.solid (hex "#000")
         , Css.borderRadius (px 5)
         , Css.backgroundColor (hex "#fff")
-        , Css.boxShadow4 (px 2) (px 2) (px 5) (hex "#ccc")
-        , Css.hover
-            [ Css.borderColor (hex "5ba3dc")
-            ]
+        , Css.boxShadow5 (px 1) (px 1) (px 10) (px -4) (hex "#333")
         ]
     , cardList =
         [ Css.displayFlex
         , Css.flexWrap Css.wrap
         , Css.justifyContent Css.center
-        , Css.paddingRight (px pxOverlap)
+        , Css.paddingLeft (px pxOverlap)
+        , Css.paddingTop (px 75)
         ]
     , cardListItem =
-        [ Css.marginLeft (px -pxOverlap) ]
+        [ Css.marginLeft (px -pxOverlap)
+        , Css.marginTop (px -75)
+        ]
     }

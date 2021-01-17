@@ -19,16 +19,16 @@ type TichuPlayer
 
 
 type Bomb
-    = StraightFlush
-    | FourOfAKind
+    = StraightFlush (List TichuCard)
+    | FourOfAKind (List TichuCard)
 
 
 type Combination
-    = Single
-    | Pair
-    | Triple
-    | ConsecutivePairs
-    | Straight
+    = Single TichuCard
+    | Pair ( TichuCard, TichuCard )
+    | Triple ( TichuCard, TichuCard, TichuCard )
+    | ConsecutivePairs (List ( TichuCard, TichuCard ))
+    | Straight (List TichuCard)
     | Bomb Bomb
 
 
@@ -75,17 +75,53 @@ tichuPlayers =
 
 tichuPlay : PlayerAction -> TichuGameDeck -> TichuGameDeck
 tichuPlay action deck =
-    case action of
-        PickUp player ->
-            moveCards
-                (\card ->
-                    card.location == PlayerLocation (InFront FaceDown) player
-                )
-                (PlayerLocation Hand player)
-                deck
+    deck
+        |> (case action of
+                PickUp player ->
+                    moveCards
+                        (\card ->
+                            card.location == PlayerLocation (InFront FaceDown) player
+                        )
+                        (PlayerLocation Hand player)
 
-        _ ->
-            deck
+                Play player combination ->
+                    let
+                        cardsInCombination =
+                            case combination of
+                                Single singleCard ->
+                                    [ singleCard ]
+
+                                Pair ( firstCard, secondCard ) ->
+                                    [ firstCard, secondCard ]
+
+                                Triple ( firstCard, secondCard, thirdCard ) ->
+                                    [ firstCard, secondCard, thirdCard ]
+
+                                ConsecutivePairs cards ->
+                                    List.concatMap
+                                        (\( firstCard, secondCard ) -> [ firstCard, secondCard ])
+                                        cards
+
+                                Straight cards ->
+                                    cards
+
+                                Bomb bomb ->
+                                    case bomb of
+                                        StraightFlush cards ->
+                                            cards
+
+                                        FourOfAKind cards ->
+                                            cards
+                    in
+                    moveCards
+                        (\card ->
+                            card.location == PlayerLocation Hand player && List.member card.definition cardsInCombination
+                        )
+                        (PlayerLocation Table player)
+
+                _ ->
+                    \d -> d
+           )
 
 
 tichuDeck : Game.Deck TichuSuit
