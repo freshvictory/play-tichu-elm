@@ -1,8 +1,8 @@
 module Page.Game exposing (Model, Msg, init, update, view)
 
 import Css exposing (hex, pct, px, rem)
-import Game.Game exposing (Card, CardState(..), Deck, Game, GameDeck, Location(..), PlayerHolding, PlayerLocation(..), playerHoldings)
-import Game.Tichu exposing (Combination(..), PlayerAction(..), TichuCard, TichuDeck, TichuGame, TichuPlayer(..), TichuSuit, tichuDeck, tichuGame, tichuPlay, tichuPlayers)
+import Game.Cards as Cards
+import Game.Tichu as Tichu
 import Html.Styled as H exposing (Html, i)
 import Html.Styled.Attributes exposing (css, list)
 import Html.Styled.Events as E
@@ -14,31 +14,27 @@ import Random
 -- MODEL
 
 
-type alias DealtDeck suit player =
-    GameDeck suit player
-
-
-type CurrentDeck suit player
+type Cards suit
     = Undealt
-    | Dealt (DealtDeck suit player)
+    | Dealt (Cards.Cards suit)
 
 
-type alias GamePlayers player =
+type alias GamePlayer =
     { id : String
     , name : String
-    , player : player
+    , player : Cards.Player
     }
 
 
 type alias Model =
     { gameId : String
-    , game : TichuGame
-    , deck : CurrentDeck TichuSuit TichuPlayer
-    , currentPlayers : List (GamePlayers TichuPlayer)
+    , game : Cards.Game Tichu.Suit Tichu.Action
+    , cards : Cards Tichu.Suit
+    , currentPlayers : List GamePlayer
     }
 
 
-currentPlayers : List (GamePlayers TichuPlayer)
+currentPlayers : List GamePlayer
 currentPlayers =
     List.indexedMap
         (\i p ->
@@ -47,12 +43,18 @@ currentPlayers =
             , player = p
             }
         )
-        tichuPlayers
+        [ Cards.North, Cards.East, Cards.South, Cards.West ]
 
 
 init : String -> ( Model, Cmd Msg )
 init gameId =
-    ( { gameId = gameId, game = tichuGame, deck = Undealt, currentPlayers = currentPlayers }, Cmd.none )
+    ( { gameId = gameId
+      , game = Cards.buildGame Tichu.gameDefinition
+      , cards = Undealt
+      , currentPlayers = currentPlayers
+      }
+    , Cmd.none
+    )
 
 
 
@@ -62,8 +64,8 @@ init gameId =
 type Msg
     = NoOp
     | Shuffle
-    | DeckShuffled TichuDeck
-    | TichuPlay PlayerAction
+    | DeckShuffled (Cards.Deck Tichu.Suit)
+    | Action Tichu.Action
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -73,28 +75,23 @@ update msg model =
             ( model, Cmd.none )
 
         Shuffle ->
-            ( model, shuffleDeck model )
+            ( model, shuffleDeck model.game.deck )
 
-        DeckShuffled deck ->
-            ( { model | deck = Dealt (dealDeck model.game deck) }, Cmd.none )
+        DeckShuffled cards ->
+            ( { model | cards = Dealt (model.game.deal cards) }, Cmd.none )
 
-        TichuPlay play ->
-            case model.deck of
+        Action action ->
+            case model.cards of
                 Undealt ->
                     ( model, Cmd.none )
 
-                Dealt deck ->
-                    ( { model | deck = Dealt (tichuPlay play deck) }, Cmd.none )
+                Dealt cards ->
+                    ( { model | cards = Dealt (model.game.act action cards) }, Cmd.none )
 
 
-shuffleDeck : Model -> Cmd Msg
-shuffleDeck model =
-    Random.generate DeckShuffled model.game.shuffledDeckGenerator
-
-
-dealDeck : Game suit player -> Deck suit -> DealtDeck suit player
-dealDeck game deck =
-    game.deal deck
+shuffleDeck : Cards.Deck Tichu.Suit -> Cmd Msg
+shuffleDeck deck =
+    Random.generate DeckShuffled (Cards.shuffle deck)
 
 
 
@@ -130,100 +127,82 @@ viewGame model =
             [ H.text "Shuffle!"
             ]
         , H.button
-            [ E.onClick (TichuPlay (PickUp North))
+            [ E.onClick (Action (Tichu.PickUp Cards.North))
             ]
             [ H.text "pick up" ]
-        , case model.deck of
+        , case model.cards of
             Dealt d ->
-                viewTable d model.currentPlayers (Just North)
+                viewTable d model.currentPlayers (Just Cards.North)
 
             Undealt ->
                 H.text ""
         ]
 
 
-viewTable : DealtDeck TichuSuit TichuPlayer -> List (GamePlayers TichuPlayer) -> Maybe TichuPlayer -> Html Msg
-viewTable deck players currentPlayer =
+viewTable : Cards.Cards Tichu.Suit -> List GamePlayer -> Maybe Cards.Player -> Html Msg
+viewTable cards players currentPlayer =
     H.div
         []
-        [ viewCardsInPlay deck players
+        [ viewCardsInPlay cards players
         , case currentPlayer of
             Just p ->
-                viewCurrentPlayer deck p
+                viewCurrentPlayer cards p
 
             Nothing ->
                 H.text ""
         ]
 
 
-viewCardsInPlay : DealtDeck TichuSuit TichuPlayer -> List (GamePlayers TichuPlayer) -> Html Msg
-viewCardsInPlay deck players =
+viewCardsInPlay : Cards.Cards Tichu.Suit -> List GamePlayer -> Html Msg
+viewCardsInPlay cards players =
     let
         cardsOnTable =
-            List.filter
-                (\card ->
-                    case card.location of
-                        PlayerLocation Table _ ->
-                            True
-
-                        _ ->
-                            False
-                )
-                deck
+            Cards.byPlay Cards.Table cards
     in
     H.div
         []
-        [ H.ol
-            [ css sharedStyle.cardList ]
-            (List.map
-                (\card ->
-                    H.li
-                        [ css sharedStyle.cardListItem ]
-                        [ viewCard card.definition
-                        ]
-                )
-                cardsOnTable
+        (List.map
+            (\( player, cardsInPlay ) ->
+                H.ol
+                    [ css sharedStyle.cardList ]
+                    (List.map
+                        (\card ->
+                            H.li
+                                [ css sharedStyle.cardListItem ]
+                                [ viewCard card
+                                ]
+                        )
+                        cardsInPlay
+                    )
             )
-        ]
+            cardsOnTable
+        )
 
 
-viewCurrentPlayer : DealtDeck TichuSuit TichuPlayer -> TichuPlayer -> Html Msg
-viewCurrentPlayer deck player =
+viewCurrentPlayer : Cards.Cards Tichu.Suit -> Cards.Player -> Html Msg
+viewCurrentPlayer cards player =
     let
-        holdings =
-            playerHoldings deck player
-
         hand =
-            List.filter (\c -> c.location == Hand) holdings
+            Cards.selectFrom (Cards.PlayerLocation Cards.Hand player) cards
 
-        ( faceUp, faceDown ) =
-            List.foldl
-                (\card acc ->
-                    case card.location of
-                        InFront FaceUp ->
-                            ( card.definition :: Tuple.first acc, Tuple.second acc )
+        faceUp =
+            Cards.selectFrom (Cards.PlayerLocation (Cards.InFront Cards.FaceUp) player) cards
 
-                        InFront FaceDown ->
-                            ( Tuple.first acc, card.definition :: Tuple.second acc )
-
-                        _ ->
-                            acc
-                )
-                ( [], [] )
-                holdings
+        faceDown =
+            Cards.selectFrom (Cards.PlayerLocation (Cards.InFront Cards.FaceDown) player) cards
     in
     H.div
         []
         [ viewPlayerFront player ( faceUp, faceDown )
         , viewHand player hand
         , H.button
-            [ E.onClick (TichuPlay (Play player (Straight (List.map .definition hand))))
+            [ E.onClick (Action (Tichu.Play player (Tichu.Straight hand)))
             ]
             [ H.text "Play" ]
         ]
 
 
-viewPlayerFront : player -> ( List (Card suit), List (Card suit) ) -> Html Msg
+viewPlayerFront : player -> ( List (Cards.Card suit), List (Cards.Card suit) ) -> Html Msg
 viewPlayerFront player ( faceUp, faceDown ) =
     H.div
         []
@@ -241,11 +220,11 @@ viewPlayerFront player ( faceUp, faceDown ) =
         ]
 
 
-viewHand : player -> List (PlayerHolding suit player) -> Html Msg
+viewHand : player -> List (Cards.Card suit) -> Html Msg
 viewHand player hand =
     let
         sortedHand =
-            List.sortBy (\c -> c.definition.rank) hand
+            List.sortBy (\c -> c.rank) hand
 
         style =
             { hand = List.append sharedStyle.cardList []
@@ -260,7 +239,7 @@ viewHand player hand =
                 (\card ->
                     H.li
                         [ css style.cardContainer ]
-                        [ viewCard card.definition
+                        [ viewCard card
                         ]
                 )
                 sortedHand
@@ -268,7 +247,7 @@ viewHand player hand =
         ]
 
 
-viewCard : Card s -> Html Msg
+viewCard : Cards.Card suit -> Html Msg
 viewCard card =
     H.div
         [ css sharedStyle.card ]
@@ -276,7 +255,7 @@ viewCard card =
         ]
 
 
-viewFaceDownCard : Card s -> Html Msg
+viewFaceDownCard : Cards.Card suit -> Html Msg
 viewFaceDownCard card =
     H.div
         [ css sharedStyle.card ]
@@ -295,6 +274,7 @@ sharedStyle =
         , Css.borderRadius (px 5)
         , Css.backgroundColor (hex "#fff")
         , Css.boxShadow5 (px 1) (px 1) (px 10) (px -4) (hex "#333")
+        , Css.padding (px 5)
         ]
     , cardList =
         [ Css.displayFlex

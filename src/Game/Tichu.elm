@@ -1,9 +1,9 @@
-module Game.Tichu exposing (..)
+module Game.Tichu exposing (Action(..), Combination(..), Suit, gameDefinition)
 
-import Game.Game as Game exposing (Card, CardState(..), Deal, Location(..), PlayerLocation(..), moveCards)
+import Game.Cards as Cards exposing (Cards)
 
 
-type TichuSuit
+type Suit
     = Special
     | Red
     | Green
@@ -11,121 +11,159 @@ type TichuSuit
     | Blue
 
 
-type TichuPlayer
-    = North
-    | South
-    | East
-    | West
+type alias Card =
+    Cards.Card Suit
 
 
 type Bomb
-    = StraightFlush (List TichuCard)
-    | FourOfAKind (List TichuCard)
+    = StraightFlush (List Card)
+    | FourOfAKind (List Card)
 
 
 type Combination
-    = Single TichuCard
-    | Pair ( TichuCard, TichuCard )
-    | Triple ( TichuCard, TichuCard, TichuCard )
-    | ConsecutivePairs (List ( TichuCard, TichuCard ))
-    | Straight (List TichuCard)
+    = Single Card
+    | Pair ( Card, Card )
+    | Triple ( Card, Card, Card )
+    | ConsecutivePairs (List ( Card, Card ))
+    | Straight (List Card)
     | Bomb Bomb
 
 
-type PlayerAction
-    = Pass TichuPlayer TichuCard TichuPlayer
-    | PickUp TichuPlayer
-    | Play TichuPlayer Combination
+type Action
+    = Pass Cards.Player Card Cards.Player
+    | PickUp Cards.Player
+    | Play Cards.Player Combination
+    | EveryonePickUp
 
 
-type alias TichuCard =
-    Card TichuSuit
+deal : Cards.Deal
+deal =
+    [ ( Cards.PlayerLocation Cards.Hand Cards.North, 8 )
+    , ( Cards.PlayerLocation Cards.Hand Cards.South, 8 )
+    , ( Cards.PlayerLocation Cards.Hand Cards.East, 8 )
+    , ( Cards.PlayerLocation Cards.Hand Cards.West, 8 )
+    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) Cards.North, 6 )
+    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) Cards.South, 6 )
+    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) Cards.East, 6 )
+    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) Cards.West, 6 )
+    ]
 
 
-type alias TichuGame =
-    Game.Game TichuSuit TichuPlayer
+gameDefinition : Cards.GameDefinition Suit Action
+gameDefinition =
+    { deck = deck
+    , deal = deal
+    , act = act
+    }
 
 
-type alias TichuDeck =
-    Game.Deck TichuSuit
+act : Action -> Cards.ActionResult Suit
+act action =
+    case action of
+        PickUp player ->
+            Cards.MoveCards
+                (\card ->
+                    card.location == Cards.PlayerLocation (Cards.InFront Cards.FaceDown) player
+                )
+                (Cards.PlayerLocation Cards.Hand player)
 
+        Pass passer cardToPass passee ->
+            Cards.MoveCards
+                (\card -> card.definition.id == cardToPass.id)
+                (Cards.PlayerLocation (Cards.PassingTo passee) passer)
 
-type alias TichuGameDeck =
-    Game.GameDeck TichuSuit TichuPlayer
+        Play player combination ->
+            let
+                cardsInCombination =
+                    case combination of
+                        Single singleCard ->
+                            [ singleCard ]
 
+                        Pair ( firstCard, secondCard ) ->
+                            [ firstCard, secondCard ]
 
-tichuDealSpecification : Deal TichuPlayer
-tichuDealSpecification =
-    [ ( PlayerLocation Hand, 8 ), ( PlayerLocation (InFront FaceDown), 6 ) ]
+                        Triple ( firstCard, secondCard, thirdCard ) ->
+                            [ firstCard, secondCard, thirdCard ]
 
+                        ConsecutivePairs cards ->
+                            List.concatMap
+                                (\( firstCard, secondCard ) -> [ firstCard, secondCard ])
+                                cards
 
-tichuGame : TichuGame
-tichuGame =
-    Game.buildGame
-        { deck = tichuDeck
-        , players = [ North, East, South, West ]
-        , dealSpecification = tichuDealSpecification
-        }
+                        Straight cards ->
+                            cards
 
-
-tichuPlayers : List TichuPlayer
-tichuPlayers =
-    [ North, East, South, West ]
-
-
-tichuPlay : PlayerAction -> TichuGameDeck -> TichuGameDeck
-tichuPlay action deck =
-    deck
-        |> (case action of
-                PickUp player ->
-                    moveCards
-                        (\card ->
-                            card.location == PlayerLocation (InFront FaceDown) player
-                        )
-                        (PlayerLocation Hand player)
-
-                Play player combination ->
-                    let
-                        cardsInCombination =
-                            case combination of
-                                Single singleCard ->
-                                    [ singleCard ]
-
-                                Pair ( firstCard, secondCard ) ->
-                                    [ firstCard, secondCard ]
-
-                                Triple ( firstCard, secondCard, thirdCard ) ->
-                                    [ firstCard, secondCard, thirdCard ]
-
-                                ConsecutivePairs cards ->
-                                    List.concatMap
-                                        (\( firstCard, secondCard ) -> [ firstCard, secondCard ])
-                                        cards
-
-                                Straight cards ->
+                        Bomb bomb ->
+                            case bomb of
+                                StraightFlush cards ->
                                     cards
 
-                                Bomb bomb ->
-                                    case bomb of
-                                        StraightFlush cards ->
-                                            cards
+                                FourOfAKind cards ->
+                                    cards
+            in
+            Cards.PlayCards
+                player
+                cardsInCombination
+                Cards.Table
 
-                                        FourOfAKind cards ->
-                                            cards
-                    in
-                    moveCards
-                        (\card ->
-                            card.location == PlayerLocation Hand player && List.member card.definition cardsInCombination
-                        )
-                        (PlayerLocation Table player)
+        EveryonePickUp ->
+            Cards.MapCards
+                (\card ->
+                    case card.location of
+                        Cards.PlayerLocation (Cards.PassingTo passee) player ->
+                            Cards.PlayerLocation Cards.Hand passee
 
-                _ ->
-                    \d -> d
-           )
+                        _ ->
+                            card.location
+                )
 
 
-tichuDeck : Game.Deck TichuSuit
-tichuDeck =
+
+-- tichuPlay : PlayerAction -> Cards TichuSuit -> Cards TichuSuit
+-- tichuPlay action cards =
+--     deck
+--         |> (case action of
+--                 PickUp player ->
+--                     Cards.move
+--                         (\card ->
+--                             card.location == PlayerLocation (InFront FaceDown) player
+--                         )
+--                         (PlayerLocation Hand player)
+--                 Play player combination ->
+--                     let
+--                         cardsInCombination =
+--                             case combination of
+--                                 Single singleCard ->
+--                                     [ singleCard ]
+--                                 Pair ( firstCard, secondCard ) ->
+--                                     [ firstCard, secondCard ]
+--                                 Triple ( firstCard, secondCard, thirdCard ) ->
+--                                     [ firstCard, secondCard, thirdCard ]
+--                                 ConsecutivePairs cards ->
+--                                     List.concatMap
+--                                         (\( firstCard, secondCard ) -> [ firstCard, secondCard ])
+--                                         cards
+--                                 Straight cards ->
+--                                     cards
+--                                 Bomb bomb ->
+--                                     case bomb of
+--                                         StraightFlush cards ->
+--                                             cards
+--                                         FourOfAKind cards ->
+--                                             cards
+--                     in
+--                     moveCards
+--                         (\card ->
+--                             card.location == PlayerLocation Hand player && List.member card.definition cardsInCombination
+--                         )
+--                         (PlayerLocation Table player)
+--                 _ ->
+--                     \d -> d
+--            )
+
+
+deck : Cards.Deck Suit
+deck =
     [ { id = "dragon"
       , displayName = "Dragon"
       , value = 25
