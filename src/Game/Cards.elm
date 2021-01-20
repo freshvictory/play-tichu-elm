@@ -10,6 +10,7 @@ import Random.Array
 type alias Card suit =
     { id : String
     , displayName : String
+    , fullName : String
     , rank : Int
     , value : Int
     , suit : suit

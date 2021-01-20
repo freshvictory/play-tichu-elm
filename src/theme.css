@@ -1,3 +1,24 @@
 :root {
-  --c-table: hsl(135, 47%, 51%);
+  --c-table: hsl(135, 50%, 50%);
+
+  --c-north: hsl(200, 94%, 35%);
+  --c-south: hsl(200, 94%, 65%);
+  --c-east: hsl(20, 94%, 35%);
+  --c-west: hsl(20, 94%, 65%);
+}
+
+/* Tichu */
+.card {
+  --card-background: white;
+  background: var(--card-background);
+}
+
+.tichu.suit{
+  --card-background: var(--c-suit-light);
+  --c-text: var(--c-suit);
+}
+
+.suit.red {
+  --c-suit: hsl(47, 85%, 59%);
+  --c-suit-light: hsl(10, 100%, 90%);
 }

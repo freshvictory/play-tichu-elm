@@ -50,8 +50,11 @@ input:focus {
   outline: none;
 }
 
-li, ul {
+li, ul, ol {
   list-style: none;
+}
+
+p, li, ol, ul {
   margin: 0;
   padding: 0;
 }

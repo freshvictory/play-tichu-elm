@@ -3,9 +3,11 @@ module Page.Game exposing (Model, Msg, init, update, view)
 import Css exposing (hex, pct, px, rem)
 import Game.Cards as Cards
 import Game.Tichu as Tichu
-import Html.Styled as H exposing (Html, i)
-import Html.Styled.Attributes exposing (css, list)
+import Html.Styled as H exposing (Html)
+import Html.Styled.Attributes as A exposing (css)
 import Html.Styled.Events as E
+import Html.Styled.Keyed as Keyed
+import Html.Styled.Lazy exposing (lazy)
 import Page
 import Random
 
@@ -202,10 +204,13 @@ viewCurrentPlayer cards player =
         ]
 
 
-viewPlayerFront : player -> ( List (Cards.Card suit), List (Cards.Card suit) ) -> Html Msg
+viewPlayerFront : Cards.Player -> ( List (Cards.Card Tichu.Suit), List (Cards.Card Tichu.Suit) ) -> Html Msg
 viewPlayerFront player ( faceUp, faceDown ) =
     H.div
-        []
+        [ css
+            [ Css.marginBottom (px -100)
+            ]
+        ]
         [ H.ol
             [ css sharedStyle.cardList ]
             (List.map
@@ -220,38 +225,61 @@ viewPlayerFront player ( faceUp, faceDown ) =
         ]
 
 
-viewHand : player -> List (Cards.Card suit) -> Html Msg
+viewHand : Cards.Player -> List (Cards.Card Tichu.Suit) -> Html Msg
 viewHand player hand =
     let
         sortedHand =
             List.sortBy (\c -> c.rank) hand
 
         style =
-            { hand = List.append sharedStyle.cardList []
-            , cardContainer = List.append sharedStyle.cardListItem []
+            { hand =
+                sharedStyle.player player
+                    ++ [ Css.padding (px 15)
+                       , Css.borderRadius (px 15)
+                       , Css.margin (px 15)
+                       , Css.position Css.relative
+                       , Css.border3 (px 2) Css.solid (hex "FFF")
+                       ]
+            , cardContainer = sharedStyle.cardListItem
             }
     in
     H.div
-        []
-        [ H.ol
-            [ css style.hand ]
+        [ css style.hand ]
+        [ Keyed.node
+            "ol"
+            [ css sharedStyle.cardList ]
             (List.map
                 (\card ->
-                    H.li
-                        [ css style.cardContainer ]
-                        [ viewCard card
-                        ]
+                    ( card.id
+                    , lazy
+                        (\c ->
+                            H.li
+                                [ css style.cardContainer ]
+                                [ viewCard c
+                                ]
+                        )
+                        card
+                    )
                 )
                 sortedHand
             )
         ]
 
 
-viewCard : Cards.Card suit -> Html Msg
+viewCard : Cards.Card Tichu.Suit -> Html Msg
 viewCard card =
     H.div
-        [ css sharedStyle.card ]
-        [ H.text card.displayName
+        [ css sharedStyle.card
+        ]
+        [ H.img
+            [ A.src ("/images/" ++ "tichu" ++ "/" ++ card.id ++ ".png")
+            , A.alt card.fullName
+            , css
+                [ Css.width (pct 100)
+                , Css.borderRadius Css.inherit
+                ]
+            ]
+            []
         ]
 
 
@@ -270,11 +298,9 @@ sharedStyle =
     { card =
         [ Css.width (px 100)
         , Css.height (px 150)
-        , Css.border3 (px 1) Css.solid (hex "#000")
+        , Css.border3 (px 2) Css.solid (hex "#000")
         , Css.borderRadius (px 5)
         , Css.backgroundColor (hex "#fff")
-        , Css.boxShadow5 (px 1) (px 1) (px 10) (px -4) (hex "#333")
-        , Css.padding (px 5)
         ]
     , cardList =
         [ Css.displayFlex
@@ -287,4 +313,24 @@ sharedStyle =
         [ Css.marginLeft (px -pxOverlap)
         , Css.marginTop (px -75)
         ]
+    , player =
+        \player ->
+            let
+                playerString =
+                    case player of
+                        Cards.North ->
+                            "north"
+
+                        Cards.South ->
+                            "south"
+
+                        Cards.East ->
+                            "east"
+
+                        Cards.West ->
+                            "west"
+            in
+            [ Css.property "--c-player" ("var(--c-" ++ playerString ++ ")")
+            , Css.property "background-color" "var(--c-player)"
+            ]
     }
