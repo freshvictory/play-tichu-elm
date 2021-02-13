@@ -2,9 +2,13 @@
   --c-table: hsl(135, 50%, 50%);
 
   --c-north: hsl(200, 94%, 35%);
-  --c-south: hsl(200, 94%, 65%);
+  --c-north-light: hsl(200, 25%, 55%);
+  --c-south: hsl(200, 94%, 55%);
+  --c-south-light: hsl(200, 25%, 75%);
   --c-east: hsl(20, 94%, 35%);
-  --c-west: hsl(20, 94%, 65%);
+  --c-east-light: hsl(20, 25%, 55%);
+  --c-west: hsl(20, 94%, 55%);
+  --c-west-light: hsl(20, 25%, 75%);
 }
 
 /* Tichu */

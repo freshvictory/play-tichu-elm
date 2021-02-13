@@ -1,7 +1,7 @@
 module Page.Game exposing (Model, Msg, init, update, view)
 
-import Css exposing (hex, pct, px, rem)
-import Game.Cards as Cards
+import Css exposing (hex, hsl, pct, px, rem)
+import Game.Cards as Cards exposing (Player(..))
 import Game.Tichu as Tichu
 import Html.Styled as H exposing (Html)
 import Html.Styled.Attributes as A exposing (css)
@@ -117,41 +117,98 @@ viewGame model =
             { game =
                 [ Css.property "background-color" "var(--c-table)"
                 , Css.height (pct 100)
+                , Css.property "display" "grid"
+                , Css.property "grid-template-rows" "max-content 1fr"
                 ]
             }
     in
     H.div
         [ css style.game ]
-        [ H.text ("Hi, it's tichu!" ++ model.gameId)
-        , H.button
-            [ E.onClick Shuffle
-            ]
-            [ H.text "Shuffle!"
-            ]
-        , H.button
-            [ E.onClick (Action (Tichu.PickUp Cards.North))
-            ]
-            [ H.text "pick up" ]
+        [ viewGameHeader model
         , case model.cards of
             Dealt d ->
-                viewTable d model.currentPlayers (Just Cards.North)
+                viewTable d model.currentPlayers (Just Cards.South)
 
             Undealt ->
                 H.text ""
         ]
 
 
+viewGameHeader : Model -> Html Msg
+viewGameHeader model =
+    H.header
+        [ css
+            [ Css.margin (rem 1)
+            , Css.displayFlex
+            , Css.alignItems Css.center
+            , Css.justifyContent Css.spaceBetween
+            ]
+        ]
+        [ H.p
+            [ css
+                [ Css.backgroundImage
+                    (Css.linearGradient2
+                        Css.toRight
+                        (Css.stop (hex "efa940"))
+                        (Css.stop (hex "f0cb66"))
+                        []
+                    )
+                , Css.fontSize (px 24)
+                ]
+            ]
+            [ H.text "tichu" ]
+        , button "Shuffle" Shuffle
+        ]
+
+
 viewTable : Cards.Cards Tichu.Suit -> List GamePlayer -> Maybe Cards.Player -> Html Msg
 viewTable cards players currentPlayer =
     H.div
-        []
-        [ viewCardsInPlay cards players
-        , case currentPlayer of
-            Just p ->
-                viewCurrentPlayer cards p
+        [ css
+            [ Css.property "display" "grid"
+            , Css.property
+                "grid-template-areas"
+                """ "   .   partner   .   "
+                    " left  table   right "
+                    "  me     me      me  "
+                """
+            , Css.property "grid-template-rows" "max-content 1fr"
+            , Css.property "grid-auto-rows" "max-content"
+            , Css.property "grid-template-columns" "55px 1fr 55px"
+            ]
+        ]
+        [ H.div
+            [ css
+                [ Css.property "grid-area" "partner" ]
+            ]
+            [ viewPlayerInfo cards North ]
+        , H.div
+            [ css
+                [ Css.property "grid-area" "left" ]
+            ]
+            [ viewPlayerInfo cards West ]
+        , H.div
+            [ css
+                [ Css.property "grid-area" "right" ]
+            ]
+            [ viewPlayerInfo cards East ]
+        , H.div
+            [ css
+                [ Css.property "grid-area" "table"
+                ]
+            ]
+            [ viewCardsInPlay cards players ]
+        , H.div
+            [ css
+                [ Css.property "grid-area" "me" ]
+            ]
+            [ case currentPlayer of
+                Just p ->
+                    viewCurrentPlayer cards p
 
-            Nothing ->
-                H.text ""
+                Nothing ->
+                    viewPlayerInfo cards South
+            ]
         ]
 
 
@@ -181,6 +238,43 @@ viewCardsInPlay cards players =
         )
 
 
+viewPlayerInfo : Cards.Cards Tichu.Suit -> Cards.Player -> Html Msg
+viewPlayerInfo cards player =
+    let
+        hand =
+            Cards.selectFrom (Cards.PlayerLocation Cards.Hand player) cards
+
+        faceDown =
+            Cards.selectFrom (Cards.PlayerLocation (Cards.InFront Cards.FaceDown) player) cards
+
+        taken =
+            Cards.selectFrom (Cards.PlayerLocation Cards.Taken player) cards
+    in
+    H.div
+        [ css
+            (sharedStyle.player player
+                ++ []
+            )
+        ]
+        [ viewPlayerTag player
+        , H.text (String.fromInt (List.length hand + List.length faceDown) ++ " in hand")
+        , H.text (String.fromInt (List.length taken) ++ " taken")
+        ]
+
+
+viewPlayerTag : Cards.Player -> Html Msg
+viewPlayerTag player =
+    H.p
+        [ css
+            [ Css.property "background-color" "var(--c-player)"
+            , Css.borderRadius (rem 0.25)
+            , Css.padding (rem 0.5)
+            , Css.color (hex "FFF")
+            ]
+        ]
+        [ H.text "Current player" ]
+
+
 viewCurrentPlayer : Cards.Cards Tichu.Suit -> Cards.Player -> Html Msg
 viewCurrentPlayer cards player =
     let
@@ -192,15 +286,34 @@ viewCurrentPlayer cards player =
 
         faceDown =
             Cards.selectFrom (Cards.PlayerLocation (Cards.InFront Cards.FaceDown) player) cards
+
+        taken =
+            Cards.selectFrom (Cards.PlayerLocation Cards.Taken player) cards
+
+        style =
+            { hand =
+                [ Css.padding (rem 1)
+
+                -- , Css.borderRadius (rem 1.25)
+                , Css.margin (rem 1)
+                , Css.position Css.relative
+
+                -- , Css.backgroundColor (hsl 135 0.5 0.75)
+                -- , Css.border3 (px 2) Css.solid (hex "FFF")
+                -- , Css.boxShadow5 (px 2) (px 2) (px 20) (px -10) (hex "000")
+                , Css.property "display" "grid"
+                , Css.property "row-gap" "2rem"
+                ]
+            }
     in
     H.div
         []
         [ viewPlayerFront player ( faceUp, faceDown )
-        , viewHand player hand
-        , H.button
-            [ E.onClick (Action (Tichu.Play player (Tichu.Straight hand)))
+        , H.div
+            [ css style.hand ]
+            [ viewCurrentPlayerHeader player (List.length hand) (List.length taken) (List.length faceDown)
+            , viewHand hand
             ]
-            [ H.text "Play" ]
         ]
 
 
@@ -208,7 +321,7 @@ viewPlayerFront : Cards.Player -> ( List (Cards.Card Tichu.Suit), List (Cards.Ca
 viewPlayerFront player ( faceUp, faceDown ) =
     H.div
         [ css
-            [ Css.marginBottom (px -100)
+            [-- Css.marginBottom (px -100)
             ]
         ]
         [ H.ol
@@ -225,45 +338,61 @@ viewPlayerFront player ( faceUp, faceDown ) =
         ]
 
 
-viewHand : Cards.Player -> List (Cards.Card Tichu.Suit) -> Html Msg
-viewHand player hand =
-    let
-        sortedHand =
-            List.sortBy (\c -> c.rank) hand
+viewHand : List (Cards.Card Tichu.Suit) -> Html Msg
+viewHand hand =
+    viewCardList hand
 
-        style =
-            { hand =
-                sharedStyle.player player
-                    ++ [ Css.padding (px 15)
-                       , Css.borderRadius (px 15)
-                       , Css.margin (px 15)
-                       , Css.position Css.relative
-                       , Css.border3 (px 2) Css.solid (hex "FFF")
-                       ]
-            , cardContainer = sharedStyle.cardListItem
-            }
-    in
+
+viewCurrentPlayerHeader : Cards.Player -> Int -> Int -> Int -> Html Msg
+viewCurrentPlayerHeader player cardsInHand cardsTaken cardsFaceDown =
     H.div
-        [ css style.hand ]
-        [ Keyed.node
-            "ol"
-            [ css sharedStyle.cardList ]
-            (List.map
-                (\card ->
-                    ( card.id
-                    , lazy
-                        (\c ->
-                            H.li
-                                [ css style.cardContainer ]
-                                [ viewCard c
-                                ]
-                        )
-                        card
-                    )
-                )
-                sortedHand
+        [ css
+            (sharedStyle.player player
+                ++ [ Css.displayFlex
+                   , Css.alignItems Css.center
+                   , Css.padding (rem 0.5)
+                   , Css.border3 (px 2) Css.solid (hex "FFF")
+                   , Css.borderRadius (rem 0.75)
+                   , Css.maxWidth Css.maxContent
+                   , Css.margin Css.auto
+                   , Css.property "background-color" "var(--c-player)"
+                   , Css.boxShadow5 (px 2) (px 2) (px 20) (px -10) (hex "000")
+                   ]
             )
         ]
+        [ viewPlayerTag player
+        , if cardsFaceDown > 0 then
+            button "Pick up" (Action (Tichu.PickUp player))
+
+          else
+            H.text ""
+        ]
+
+
+viewCardList : List (Cards.Card Tichu.Suit) -> Html Msg
+viewCardList cards =
+    let
+        sortedCards =
+            List.sortBy (\c -> c.rank) cards
+    in
+    Keyed.node
+        "ol"
+        [ css sharedStyle.cardList ]
+        (List.map
+            (\card ->
+                ( card.id
+                , lazy
+                    (\c ->
+                        H.li
+                            [ css sharedStyle.cardListItem ]
+                            [ viewCard c
+                            ]
+                    )
+                    card
+                )
+            )
+            sortedCards
+        )
 
 
 viewCard : Cards.Card Tichu.Suit -> Html Msg
@@ -286,20 +415,53 @@ viewCard card =
 viewFaceDownCard : Cards.Card suit -> Html Msg
 viewFaceDownCard card =
     H.div
-        [ css sharedStyle.card ]
+        [ css
+            (sharedStyle.card
+                ++ [ Css.backgroundImage
+                        (Css.linearGradient2
+                            (Css.deg 150)
+                            (Css.stop <| hex "dadada")
+                            (Css.stop2 (hex "dadada") <| pct 10)
+                            [ Css.stop2 (hex "ffd9d3") <| pct 10
+                            , Css.stop2 (hex "ffd9d3") <| pct 20
+                            , Css.stop2 (hex "d8f1d8") <| pct 20
+                            , Css.stop2 (hex "d8f1d8") <| pct 30
+                            , Css.stop2 (hex "cfdfff") <| pct 30
+                            , Css.stop2 (hex "cfdfff") <| pct 40
+                            , Css.stop2 (hex "fcf4db") <| pct 40
+                            ]
+                        )
+                   ]
+            )
+        ]
         []
+
+
+button : String -> msg -> Html msg
+button text message =
+    H.button
+        [ css
+            [ Css.border3 (px 2) Css.solid (hex "FFF")
+            , Css.borderRadius (rem 0.25)
+            , Css.padding (rem 0.25)
+            , Css.backgroundColor (hex "d9d9d9")
+            ]
+        , E.onClick message
+        ]
+        [ H.text text ]
 
 
 sharedStyle =
     let
         pxOverlap =
-            50
+            25
     in
     { card =
         [ Css.width (px 100)
         , Css.height (px 150)
-        , Css.border3 (px 2) Css.solid (hex "#000")
-        , Css.borderRadius (px 5)
+        , Css.border3 (px 1) Css.solid (hex "999")
+        , Css.boxShadow5 (px 1) (px 1) (px 10) (px -5) (hex "000")
+        , Css.borderRadius (rem 0.5)
         , Css.backgroundColor (hex "#fff")
         ]
     , cardList =
@@ -308,6 +470,7 @@ sharedStyle =
         , Css.justifyContent Css.center
         , Css.paddingLeft (px pxOverlap)
         , Css.paddingTop (px 75)
+        , Css.minHeight (px 150)
         ]
     , cardListItem =
         [ Css.marginLeft (px -pxOverlap)
@@ -331,6 +494,5 @@ sharedStyle =
                             "west"
             in
             [ Css.property "--c-player" ("var(--c-" ++ playerString ++ ")")
-            , Css.property "background-color" "var(--c-player)"
             ]
     }
