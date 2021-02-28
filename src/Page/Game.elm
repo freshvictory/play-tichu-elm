@@ -1,6 +1,7 @@
 module Page.Game exposing (Model, Msg, init, update, view)
 
 import Css exposing (hex, hsl, pct, px, rem)
+import Css.Transitions
 import Game.Cards as Cards exposing (Player(..))
 import Game.Tichu as Tichu
 import Html.Styled as H exposing (Html)
@@ -157,7 +158,7 @@ viewGameHeader model =
                 ]
             ]
             [ H.text "tichu" ]
-        , button "Shuffle" Shuffle
+        , button [] "Shuffle" Shuffle
         ]
 
 
@@ -270,6 +271,8 @@ viewPlayerTag player =
             , Css.borderRadius (rem 0.25)
             , Css.padding (rem 0.5)
             , Css.color (hex "FFF")
+            , Css.lineHeight (Css.int 1)
+            , Css.fontWeight Css.bold
             ]
         ]
         [ H.text "Current player" ]
@@ -302,7 +305,7 @@ viewCurrentPlayer cards player =
                 -- , Css.border3 (px 2) Css.solid (hex "FFF")
                 -- , Css.boxShadow5 (px 2) (px 2) (px 20) (px -10) (hex "000")
                 , Css.property "display" "grid"
-                , Css.property "row-gap" "2rem"
+                , Css.property "row-gap" "1rem"
                 ]
             }
     in
@@ -324,17 +327,41 @@ viewPlayerFront player ( faceUp, faceDown ) =
             [-- Css.marginBottom (px -100)
             ]
         ]
-        [ H.ol
-            [ css sharedStyle.cardList ]
-            (List.map
-                (\card ->
-                    H.li
-                        [ css sharedStyle.cardListItem ]
-                        [ viewFaceDownCard card
+        [ if List.length faceDown > 0 then
+            H.div
+                [ css
+                    [ Css.position Css.relative
+                    ]
+                ]
+                [ H.div
+                    [ css
+                        [ Css.position Css.absolute
+                        , Css.top (pct 66)
+                        , Css.left (pct 50)
+                        , Css.transform (Css.translate2 (pct -50) (pct -50))
                         ]
-                )
-                faceDown
-            )
+                    ]
+                    [ button
+                        [ Css.boxShadow4 (px 1) (px 1) (px 7) (hex "777")
+                        ]
+                        "Pick up"
+                        (Action (Tichu.PickUp player))
+                    ]
+                , H.ol
+                    [ css sharedStyle.cardList ]
+                    (List.map
+                        (\card ->
+                            H.li
+                                [ css sharedStyle.cardListItem ]
+                                [ viewFaceDownCard card
+                                ]
+                        )
+                        faceDown
+                    )
+                ]
+
+          else
+            H.text ""
         ]
 
 
@@ -353,19 +380,13 @@ viewCurrentPlayerHeader player cardsInHand cardsTaken cardsFaceDown =
                    , Css.padding (rem 0.5)
                    , Css.border3 (px 2) Css.solid (hex "FFF")
                    , Css.borderRadius (rem 0.75)
-                   , Css.maxWidth Css.maxContent
-                   , Css.margin Css.auto
                    , Css.property "background-color" "var(--c-player)"
                    , Css.boxShadow5 (px 2) (px 2) (px 20) (px -10) (hex "000")
+                   , Css.justifyContent Css.spaceBetween
                    ]
             )
         ]
         [ viewPlayerTag player
-        , if cardsFaceDown > 0 then
-            button "Pick up" (Action (Tichu.PickUp player))
-
-          else
-            H.text ""
         ]
 
 
@@ -398,7 +419,18 @@ viewCardList cards =
 viewCard : Cards.Card Tichu.Suit -> Html Msg
 viewCard card =
     H.div
-        [ css sharedStyle.card
+        [ css
+            (sharedStyle.card
+                ++ [ Css.position Css.relative
+                   , Css.Transitions.transition
+                        [ Css.Transitions.transform3 80 0 Css.Transitions.easeIn ]
+                   , Css.hover
+                        [ Css.transforms [ Css.translateY (px -10), Css.scale 1.05 ]
+                        , Css.Transitions.transition
+                            [ Css.Transitions.transform3 100 0 Css.Transitions.easeOut ]
+                        ]
+                   ]
+            )
         ]
         [ H.img
             [ A.src ("/images/" ++ "tichu" ++ "/" ++ card.id ++ ".png")
@@ -437,15 +469,22 @@ viewFaceDownCard card =
         []
 
 
-button : String -> msg -> Html msg
-button text message =
+button : List Css.Style -> String -> msg -> Html msg
+button styles text message =
     H.button
         [ css
-            [ Css.border3 (px 2) Css.solid (hex "FFF")
-            , Css.borderRadius (rem 0.25)
-            , Css.padding (rem 0.25)
-            , Css.backgroundColor (hex "d9d9d9")
-            ]
+            ([ Css.border3 (px 2) Css.solid (hex "333")
+             , Css.borderRadius (rem 0.25)
+             , Css.padding (rem 0.25)
+             , Css.backgroundColor (hex "d9d9d9")
+             , Css.color (hex "000")
+             , sharedStyle.focus
+             , Css.active
+                [ Css.backgroundColor (hex "eee")
+                ]
+             ]
+                ++ styles
+            )
         , E.onClick message
         ]
         [ H.text text ]
@@ -459,9 +498,9 @@ sharedStyle =
     { card =
         [ Css.width (px 100)
         , Css.height (px 150)
-        , Css.border3 (px 1) Css.solid (hex "999")
+        , Css.border3 (px 1) Css.solid (hex "1b1b1b")
         , Css.boxShadow5 (px 1) (px 1) (px 10) (px -5) (hex "000")
-        , Css.borderRadius (rem 0.5)
+        , Css.borderRadius (rem 0.25)
         , Css.backgroundColor (hex "#fff")
         ]
     , cardList =
@@ -476,6 +515,11 @@ sharedStyle =
         [ Css.marginLeft (px -pxOverlap)
         , Css.marginTop (px -75)
         ]
+    , focus =
+        Css.focus
+            [ Css.outline Css.none
+            , Css.boxShadow5 Css.zero Css.zero (px 2) (px 3) (hex "4973db")
+            ]
     , player =
         \player ->
             let

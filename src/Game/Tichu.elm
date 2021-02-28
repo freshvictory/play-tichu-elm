@@ -36,6 +36,11 @@ type Action
     | EveryonePickUp
 
 
+type Phase
+    = Passing
+    | Playing
+
+
 deal : Cards.Deal
 deal =
     [ ( Cards.PlayerLocation Cards.Hand Cards.North, 8 )

@@ -10,19 +10,3 @@
   --c-west: hsl(20, 94%, 55%);
   --c-west-light: hsl(20, 25%, 75%);
 }
-
-/* Tichu */
-.card {
-  --card-background: white;
-  background: var(--card-background);
-}
-
-.tichu.suit{
-  --card-background: var(--c-suit-light);
-  --c-text: var(--c-suit);
-}
-
-.suit.red {
-  --c-suit: hsl(47, 85%, 59%);
-  --c-suit-light: hsl(10, 100%, 90%);
-}
