@@ -1,7 +1,8 @@
-module Game.Cards exposing (ActionResult(..), Card, CardState(..), Cards, Deal, Deck, Game, GameDefinition, Location(..), PlayedLocation(..), Player(..), PlayerLocation(..), buildGame, byPlay, selectFrom, shuffle)
+module Game.Cards exposing (ActionResult(..), Card, CardState(..), Cards, Deal, Deck, Location(..), PlayableDeck, PlayableDeckDefinition, PlayedLocation(..), PlayerLocation(..), act, buildDeck, byPlay, findById, selectFrom, shuffle)
 
 import Array exposing (Array)
 import Dict exposing (Dict)
+import Game.Players exposing (Player(..))
 import List
 import Random
 import Random.Array
@@ -49,13 +50,6 @@ type PlayedLocation
     = Table
 
 
-type Player
-    = North
-    | South
-    | East
-    | West
-
-
 type Cards suit
     = Cards (List (CardInPlay suit)) Plays
 
@@ -70,6 +64,15 @@ type Play
 
 type Plays
     = Plays Int (Dict Int Player)
+
+
+findById : String -> Cards suit -> Maybe (CardInPlay suit)
+findById id (Cards cards _) =
+    List.head
+        (List.filter
+            (\c -> c.definition.id == id)
+            cards
+        )
 
 
 selectFrom : Location -> Cards suit -> List (Card suit)
@@ -185,19 +188,18 @@ type ActionResult suit
     = MoveCards (CardInPlay suit -> Bool) Location
     | MapCards (CardInPlay suit -> Location)
     | PlayCards Player (List (Card suit)) PlayedLocation
+    | NoOp
 
 
-type alias GameDefinition suit action =
+type alias PlayableDeckDefinition suit =
     { deck : Deck suit
     , deal : Deal
-    , act : action -> ActionResult suit
     }
 
 
-type alias Game suit action =
+type alias PlayableDeck suit =
     { deck : Deck suit
     , deal : Deck suit -> Cards suit
-    , act : action -> Cards suit -> Cards suit
     }
 
 
@@ -216,12 +218,14 @@ act action (Cards cards plays) =
         PlayCards player cardsToPlay newLocation ->
             play player cardsToPlay newLocation (Cards cards plays)
 
+        NoOp ->
+            Cards cards plays
 
-buildGame : GameDefinition suit action -> Game suit action
-buildGame gameDefinition =
-    { deck = gameDefinition.deck
-    , deal = deal gameDefinition.deal
-    , act = gameDefinition.act >> act
+
+buildDeck : PlayableDeckDefinition suit -> PlayableDeck suit
+buildDeck deckDefinition =
+    { deck = deckDefinition.deck
+    , deal = deal deckDefinition.deal
     }
 
 

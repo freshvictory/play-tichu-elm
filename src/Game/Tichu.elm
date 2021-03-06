@@ -1,6 +1,9 @@
-module Game.Tichu exposing (Action(..), Combination(..), Suit(..), gameDefinition)
+module Game.Tichu exposing (Action(..), Bet(..), Combination(..), Game, Phase(..), PlayingState(..), PreGameState(..), Suit(..), act, deckDefinition, newGame)
 
 import Game.Cards as Cards exposing (Cards)
+import Game.Players as Players exposing (Player(..), Players)
+import Html exposing (a)
+import List
 
 
 type Suit
@@ -30,40 +33,194 @@ type Combination
 
 
 type Action
-    = Pass Cards.Player Card Cards.Player
-    | PickUp Cards.Player
-    | Play Cards.Player Combination
+    = PassCards Player ( Card, Card, Card )
+    | PickUp Player
+    | CallGrandTichu Player
+    | CallTichu Player
+    | Play Player Combination
+    | Pass Player
+    | TakeTrick Player
+    | GiveDragon Player
+    | Wish Int
     | EveryonePickUp
 
 
+
+-- type PlayerAction
+--     = Pass Cards.Player Card
+--     | PickUp
+--     | CallGrandTichu
+--     | CallTichu
+--     | Wish Int
+--     | Play Combination
+
+
 type Phase
-    = Passing
-    | Playing
+    = PreGame (Players PreGameState)
+    | Playing (Players PlayingState)
+
+
+type PreGameState
+    = JustDealt
+    | PickedUp
+    | PassedCards
+
+
+type PlayingState
+    = Lead
+    | LeadAndWish
+    | FulfillWish
+    | WonTrick
+    | WonTrickWithDragon
+    | PlayOrPass
+    | Idle
+    | Passed
+
+
+type Bet
+    = None
+    | Tichu
+    | GrandTichu
+
+
+type alias Game =
+    { phase : Phase
+    , cards : Cards Suit
+    , bets : Players Bet
+    }
+
+
+newGame : Cards Suit -> Game
+newGame cards =
+    { phase = PreGame (Players.all JustDealt)
+    , cards = cards
+    , bets = Players.all None
+    }
+
+
+act : Action -> Game -> Game
+act action game =
+    let
+        cardsAfterAction =
+            Cards.act (cardAction action) game.cards
+    in
+    case game.phase of
+        PreGame state ->
+            case action of
+                PickUp player ->
+                    { game
+                        | phase = PreGame (Players.set player PickedUp state)
+                        , cards = cardsAfterAction
+                    }
+
+                PassCards player _ ->
+                    let
+                        playersWhovePassed =
+                            Players.filter
+                                (\s -> s == PassedCards)
+                                state
+                    in
+                    if List.length playersWhovePassed == 3 then
+                        let
+                            pickedUpCards =
+                                Cards.act (cardAction EveryonePickUp) cardsAfterAction
+
+                            birdLocation =
+                                Cards.findById "bird" pickedUpCards
+
+                            playerWithBird =
+                                case birdLocation of
+                                    Just card ->
+                                        case card.location of
+                                            Cards.PlayerLocation Cards.Hand p ->
+                                                p
+
+                                            _ ->
+                                                North
+
+                                    _ ->
+                                        North
+
+                            playingDefaultState =
+                                Players.all Idle
+
+                            playingState =
+                                Players.set playerWithBird Lead playingDefaultState
+                        in
+                        { game
+                            | phase = Playing playingState
+                            , cards = pickedUpCards
+                        }
+
+                    else
+                        { game
+                            | phase = PreGame (Players.set player PassedCards state)
+                            , cards = cardsAfterAction
+                        }
+
+                CallGrandTichu player ->
+                    { game
+                        | bets = Players.set player GrandTichu game.bets
+                        , phase = PreGame (Players.set player PickedUp state)
+                        , cards = cardsAfterAction
+                    }
+
+                CallTichu player ->
+                    { game
+                        | bets = Players.set player Tichu game.bets
+                        , cards = cardsAfterAction
+                    }
+
+                _ ->
+                    game
+
+        Playing state ->
+            case action of
+                Play player combination ->
+                    { game
+                        | phase = Playing (Players.set player Idle state)
+                    }
+
+                Pass player ->
+                    let
+                        playersPassed =
+                            Players.filter
+                                (\s -> s == Passed)
+                                state
+                    in
+                    game
+
+                CallTichu player ->
+                    { game
+                        | bets = Players.set player Tichu game.bets
+                    }
+
+                _ ->
+                    game
 
 
 deal : Cards.Deal
 deal =
-    [ ( Cards.PlayerLocation Cards.Hand Cards.North, 8 )
-    , ( Cards.PlayerLocation Cards.Hand Cards.South, 8 )
-    , ( Cards.PlayerLocation Cards.Hand Cards.East, 8 )
-    , ( Cards.PlayerLocation Cards.Hand Cards.West, 8 )
-    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) Cards.North, 6 )
-    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) Cards.South, 6 )
-    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) Cards.East, 6 )
-    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) Cards.West, 6 )
+    [ ( Cards.PlayerLocation Cards.Hand North, 8 )
+    , ( Cards.PlayerLocation Cards.Hand South, 8 )
+    , ( Cards.PlayerLocation Cards.Hand East, 8 )
+    , ( Cards.PlayerLocation Cards.Hand West, 8 )
+    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) North, 6 )
+    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) South, 6 )
+    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) East, 6 )
+    , ( Cards.PlayerLocation (Cards.InFront Cards.FaceDown) West, 6 )
     ]
 
 
-gameDefinition : Cards.GameDefinition Suit Action
-gameDefinition =
+deckDefinition : Cards.PlayableDeckDefinition Suit
+deckDefinition =
     { deck = deck
     , deal = deal
-    , act = act
     }
 
 
-act : Action -> Cards.ActionResult Suit
-act action =
+cardAction : Action -> Cards.ActionResult Suit
+cardAction action =
     case action of
         PickUp player ->
             Cards.MoveCards
@@ -72,10 +229,21 @@ act action =
                 )
                 (Cards.PlayerLocation Cards.Hand player)
 
-        Pass passer cardToPass passee ->
-            Cards.MoveCards
-                (\card -> card.definition.id == cardToPass.id)
-                (Cards.PlayerLocation (Cards.PassingTo passee) passer)
+        PassCards passer ( toPartner, toNext, toPrevious ) ->
+            Cards.MapCards
+                (\card ->
+                    if card.definition.id == toPartner.id then
+                        Cards.PlayerLocation (Cards.PassingTo (Players.partner passer)) passer
+
+                    else if card.definition.id == toNext.id then
+                        Cards.PlayerLocation (Cards.PassingTo (Players.next passer)) passer
+
+                    else if card.definition.id == toPrevious.id then
+                        Cards.PlayerLocation (Cards.PassingTo (Players.previous passer)) passer
+
+                    else
+                        card.location
+                )
 
         Play player combination ->
             let
@@ -115,12 +283,52 @@ act action =
             Cards.MapCards
                 (\card ->
                     case card.location of
-                        Cards.PlayerLocation (Cards.PassingTo passee) player ->
+                        Cards.PlayerLocation (Cards.PassingTo passee) _ ->
                             Cards.PlayerLocation Cards.Hand passee
 
                         _ ->
                             card.location
                 )
+
+        CallTichu _ ->
+            Cards.NoOp
+
+        CallGrandTichu player ->
+            Cards.MoveCards
+                (\card ->
+                    card.location == Cards.PlayerLocation (Cards.InFront Cards.FaceDown) player
+                )
+                (Cards.PlayerLocation Cards.Hand player)
+
+        Pass _ ->
+            Cards.NoOp
+
+        TakeTrick player ->
+            Cards.MoveCards
+                (\card ->
+                    case card.location of
+                        Cards.PlayedLocation Cards.Table _ ->
+                            True
+
+                        _ ->
+                            False
+                )
+                (Cards.PlayerLocation Cards.Hand player)
+
+        GiveDragon player ->
+            Cards.MoveCards
+                (\card ->
+                    case card.location of
+                        Cards.PlayedLocation Cards.Table _ ->
+                            True
+
+                        _ ->
+                            False
+                )
+                (Cards.PlayerLocation Cards.Hand player)
+
+        Wish _ ->
+            Cards.NoOp
 
 
 deck : Cards.Deck Suit

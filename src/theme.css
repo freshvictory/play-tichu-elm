@@ -1,12 +1,12 @@
 :root {
   --c-table: hsl(135, 50%, 50%);
 
-  --c-north: hsl(200, 94%, 35%);
+  --c-north: hsl(200, 61.94%, 43.22%);
   --c-north-light: hsl(200, 25%, 55%);
-  --c-south: hsl(200, 94%, 55%);
+  --c-south: hsl(200, 36.99%, 29.2%);
   --c-south-light: hsl(200, 25%, 75%);
-  --c-east: hsl(20, 94%, 35%);
+  --c-east: hsl(0, 50.14%, 51.87%);
   --c-east-light: hsl(20, 25%, 55%);
-  --c-west: hsl(20, 94%, 55%);
+  --c-west: hsl(0, 44.93%, 36.23%);
   --c-west-light: hsl(20, 25%, 75%);
 }
