@@ -12,6 +12,7 @@ import Html.Styled.Keyed as Keyed
 import Html.Styled.Lazy exposing (lazy)
 import Page
 import Random
+import Set exposing (Set)
 import Svg
 import Svg.Styled exposing (Svg)
 
@@ -37,6 +38,7 @@ type alias Model =
     , deck : Cards.PlayableDeck Tichu.Suit
     , game : Game Tichu.Suit
     , currentPlayers : Players GamePlayer
+    , selectedCards : Set String
     }
 
 
@@ -56,6 +58,7 @@ init gameId =
       , deck = Cards.buildDeck Tichu.deckDefinition
       , game = Undealt
       , currentPlayers = currentPlayers
+      , selectedCards = Set.empty
       }
     , Cmd.none
     )
@@ -70,6 +73,7 @@ type Msg
     | Shuffle
     | DeckShuffled (Cards.Deck Tichu.Suit)
     | Action Tichu.Action
+    | ToggleCard String Bool
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -82,7 +86,7 @@ update msg model =
             ( model, shuffleDeck model.deck.deck )
 
         DeckShuffled cards ->
-            ( { model | game = Dealt (Tichu.newGame (model.deck.deal cards)) }, Cmd.none )
+            ( { model | game = Dealt (Tichu.newGame (model.deck.deal cards)), selectedCards = Set.empty }, Cmd.none )
 
         Action action ->
             case model.game of
@@ -91,6 +95,18 @@ update msg model =
 
                 Dealt game ->
                     ( { model | game = Dealt (Tichu.act action game) }, Cmd.none )
+
+        ToggleCard id checked ->
+            ( { model
+                | selectedCards =
+                    if checked then
+                        Set.insert id model.selectedCards
+
+                    else
+                        Set.remove id model.selectedCards
+              }
+            , Cmd.none
+            )
 
 
 shuffleDeck : Cards.Deck Tichu.Suit -> Cmd Msg
@@ -129,7 +145,7 @@ viewGame model =
         [ viewGameHeader model
         , case model.game of
             Dealt game ->
-                viewTable game model.currentPlayers (Just East)
+                viewTable model game model.currentPlayers (Just South)
 
             Undealt ->
                 H.text ""
@@ -163,8 +179,8 @@ viewGameHeader model =
         ]
 
 
-viewTable : Tichu.Game -> Players GamePlayer -> Maybe Player -> Html Msg
-viewTable game players currentPlayer =
+viewTable : Model -> Tichu.Game -> Players GamePlayer -> Maybe Player -> Html Msg
+viewTable model game players currentPlayer =
     let
         order =
             case currentPlayer of
@@ -253,7 +269,7 @@ viewTable game players currentPlayer =
             ]
             [ case currentPlayer of
                 Just p ->
-                    viewPlayer game (Players.get p players)
+                    viewPlayer model game (Players.get p players)
 
                 Nothing ->
                     viewPlayerInfo game (Players.get order.bottom players)
@@ -335,8 +351,8 @@ viewPlayerTag player =
         [ H.text player.name ]
 
 
-viewPlayer : Tichu.Game -> GamePlayer -> Html Msg
-viewPlayer game player =
+viewPlayer : Model -> Tichu.Game -> GamePlayer -> Html Msg
+viewPlayer model game player =
     let
         hand =
             Cards.selectFrom (Cards.PlayerLocation Cards.Hand player.player) game.cards
@@ -374,7 +390,7 @@ viewPlayer game player =
         , H.div
             [ css style.hand ]
             [ viewPlayerInfo game player
-            , viewHand hand
+            , viewHand hand model.selectedCards
             ]
         ]
 
@@ -436,9 +452,9 @@ viewPlayerFront player ( faceUp, faceDown ) =
         ]
 
 
-viewHand : List (Cards.Card Tichu.Suit) -> Html Msg
-viewHand hand =
-    viewCardList hand
+viewHand : List (Cards.Card Tichu.Suit) -> Set String -> Html Msg
+viewHand hand selectedCards =
+    viewCardList hand selectedCards
 
 
 viewBet : Tichu.Bet -> Html Msg
@@ -493,8 +509,8 @@ viewBet bet =
             H.text ""
 
 
-viewCardList : List (Cards.Card Tichu.Suit) -> Html Msg
-viewCardList cards =
+viewCardList : List (Cards.Card Tichu.Suit) -> Set String -> Html Msg
+viewCardList cards selectedCards =
     let
         sortedCards =
             List.sortBy (\c -> c.rank) cards
@@ -509,7 +525,30 @@ viewCardList cards =
                     (\c ->
                         H.li
                             [ css sharedStyle.cardListItem ]
-                            [ viewCard c
+                            [ H.label
+                                [ css
+                                    [ Css.display Css.block
+                                    , Css.Transitions.transition [ Css.Transitions.transform 150 ]
+                                    , Css.transform
+                                        (if Set.member c.id selectedCards then
+                                            Css.translateY (px -20)
+
+                                         else
+                                            Css.translateY Css.zero
+                                        )
+                                    ]
+                                ]
+                                [ H.input
+                                    [ A.type_ "checkbox"
+                                    , A.checked (Set.member c.id selectedCards)
+                                    , E.onCheck (ToggleCard c.id)
+                                    , css
+                                        [ Css.display Css.none
+                                        ]
+                                    ]
+                                    []
+                                , viewCard c
+                                ]
                             ]
                     )
                     card
