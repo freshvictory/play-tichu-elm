@@ -1,10 +1,10 @@
 port module Main exposing (main)
 
-import Api
 import Browser
 import Browser.Navigation as Nav
-import Html.Styled exposing (Html, div, text, toUnstyled)
+import Html.Styled as Html
 import Page
+import Page.Design as Design
 import Page.Game as Game
 import Page.Home as Home
 import Url
@@ -12,7 +12,6 @@ import Url.Parser as Parser
     exposing
         ( (</>)
         , Parser
-        , map
         , oneOf
         , s
         , top
@@ -52,6 +51,7 @@ type Page
     = NotFound
     | Home Home.Model
     | Game Game.Model
+    | Design Design.Model
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -68,6 +68,7 @@ type Msg
     | UrlChanged Url.Url
     | HomeMsg Home.Msg
     | GameMsg Game.Msg
+    | DesignMsg Design.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -95,6 +96,9 @@ update msg model =
         ( GameMsg m, Game g ) ->
             routeGame model (Game.update m g)
 
+        ( DesignMsg m, Design d ) ->
+            routeDesign model (Design.update m d)
+
         _ ->
             ( model, Cmd.none )
 
@@ -109,6 +113,11 @@ routeGame model ( game, m ) =
     ( { model | page = Game game }, Cmd.map GameMsg m )
 
 
+routeDesign : Model -> ( Design.Model, Cmd Design.Msg ) -> ( Model, Cmd Msg )
+routeDesign model ( design, m ) =
+    ( { model | page = Design design }, Cmd.map DesignMsg m )
+
+
 
 ---- VIEW ----
 
@@ -120,7 +129,7 @@ view model =
             Page.view never
                 { title = "Not found"
                 , attrs = []
-                , body = [ text "Page not found." ]
+                , body = [ Html.text "Page not found." ]
                 }
 
         Home home ->
@@ -128,6 +137,9 @@ view model =
 
         Game game ->
             Page.view GameMsg (Game.view game)
+
+        Design design ->
+            Page.view DesignMsg (Design.view design)
 
 
 
@@ -145,6 +157,8 @@ routeToUrl url model =
                     (routeHome model Home.init)
                 , route (s "game" </> Parser.string)
                     (\gameId -> routeGame model (Game.init gameId))
+                , route (s "design")
+                    (routeDesign model Design.init)
                 ]
     in
     case Parser.parse parser url of

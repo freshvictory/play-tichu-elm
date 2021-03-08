@@ -2,6 +2,7 @@ module Page.Game exposing (Model, Msg, init, update, view)
 
 import Css exposing (hex, hsl, pct, px, rem)
 import Css.Transitions
+import Design
 import Game.Cards as Cards
 import Game.Players as Players exposing (Player(..), Players)
 import Game.Tichu as Tichu
@@ -133,7 +134,7 @@ viewGame model =
     let
         style =
             { game =
-                [ Css.property "background-color" "var(--c-table)"
+                [ Css.backgroundColor Design.color.table
                 , Css.height (pct 100)
                 , Css.property "display" "grid"
                 , Css.property "grid-template-rows" "max-content 1fr"
@@ -175,7 +176,7 @@ viewGameHeader model =
                 ]
             ]
             [ H.text "tichu" ]
-        , button [] "Shuffle" Shuffle
+        , Design.button.secondary "Shuffle" Shuffle []
         ]
 
 
@@ -319,10 +320,10 @@ viewPlayerInfo game player =
                    , Css.property "grid-auto-flow" "column"
                    , Css.property "column-gap" "1rem"
                    , Css.alignItems Css.center
-                   , Css.padding (rem 0.5)
-                   , Css.borderRadius (rem 0.75)
+                   , Css.padding Design.spacing.small
+                   , Css.borderRadius Design.borderRadius.outer
                    , Css.backgroundColor (Css.hsl 135.0 0.5261 0.8418)
-                   , Css.boxShadow5 Css.zero Css.zero (px 20) (px -10) (hex "000")
+                   , Design.shadow.underscore
                    , Css.justifyContent Css.spaceBetween
                    , Css.margin Css.auto
                    , Css.property "width" "max-content"
@@ -330,7 +331,12 @@ viewPlayerInfo game player =
             )
         ]
         [ viewPlayerTag player
-        , svgWithText Svg.hand (String.fromInt (List.length hand))
+        , H.span
+            [ css
+                [ Css.color Design.color.lightPrimary
+                ]
+            ]
+            [ svgWithText Svg.hand (String.fromInt (List.length hand)) ]
         , svgWithText Svg.stack (String.fromInt (List.length taken))
         , viewBet (Players.get player.player game.bets)
         ]
@@ -342,10 +348,10 @@ viewPlayerTag player =
         [ css
             [ Css.property "background-color" "var(--c-player)"
             , Css.borderRadius (rem 0.25)
-            , Css.padding (rem 0.5)
-            , Css.color (hex "FFF")
+            , Css.padding Design.spacing.xsmall
+            , Css.color Design.color.white
             , Css.lineHeight (Css.int 1)
-            , Css.fontWeight Css.bold
+            , Css.fontSize Design.font.large
             ]
         ]
         [ H.text player.name ]
@@ -417,11 +423,11 @@ viewPlayerFront player ( faceUp, faceDown ) =
                         , Css.alignItems Css.center
                         ]
                     ]
-                    [ button
-                        [ Css.width (pct 100)
-                        ]
+                    [ Design.button.primary
                         "Pick up"
                         (Action (Tichu.PickUp player))
+                        [ Css.width (pct 100)
+                        ]
                     , H.p
                         [ css
                             [ Css.fontStyle Css.italic
@@ -429,10 +435,10 @@ viewPlayerFront player ( faceUp, faceDown ) =
                             ]
                         ]
                         [ H.text "or" ]
-                    , button
-                        []
+                    , Design.button.primary
                         "Call Grand Tichu"
                         (Action (Tichu.CallGrandTichu player))
+                        []
                     ]
                 , H.ol
                     [ css sharedStyle.cardList ]
@@ -633,32 +639,6 @@ svgWithText svg text =
         ]
 
 
-button : List Css.Style -> String -> msg -> Html msg
-button styles text message =
-    H.button
-        [ css
-            ([ Css.border3 (px 2) Css.solid (hex "fff")
-             , Css.borderRadius (rem 0.25)
-             , Css.padding (rem 0.25)
-             , Css.backgroundColor (hex "ffd35b")
-             , Css.boxShadow4 (px 1) (px 1) (px 7) (hex "777")
-             , Css.color (hex "000")
-             , Css.fontVariant Css.smallCaps
-             , sharedStyle.focus
-             , Css.hover
-                [ Css.backgroundColor (hex "ffe291")
-                ]
-             , Css.active
-                [ Css.backgroundColor (hex "ffeebe")
-                ]
-             ]
-                ++ styles
-            )
-        , E.onClick message
-        ]
-        [ H.text text ]
-
-
 sharedStyle =
     let
         pxOverlap =
@@ -684,11 +664,6 @@ sharedStyle =
         [ Css.marginLeft (px -pxOverlap)
         , Css.marginTop (px -75)
         ]
-    , focus =
-        Css.focus
-            [ Css.outline Css.none
-            , Css.boxShadow5 Css.zero Css.zero (px 2) (px 3) (hex "4973db")
-            ]
     , player =
         \player ->
             let
