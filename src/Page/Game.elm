@@ -1,6 +1,6 @@
 module Page.Game exposing (Model, Msg, init, update, view)
 
-import Css exposing (hex, hsl, pct, px, rem)
+import Css exposing (pct, px, rem)
 import Css.Transitions
 import Design
 import Game.Cards as Cards
@@ -134,7 +134,7 @@ viewGame model =
     let
         style =
             { game =
-                [ Css.backgroundColor Design.color.table.color
+                [ Css.backgroundColor Design.color.table
                 , Css.height (pct 100)
                 , Css.property "display" "grid"
                 , Css.property "grid-template-rows" "max-content 1fr"
@@ -157,7 +157,7 @@ viewGameHeader : Model -> Html Msg
 viewGameHeader model =
     H.header
         [ css
-            [ Css.margin (rem 1)
+            [ Css.margin Design.spacing.medium
             , Css.displayFlex
             , Css.alignItems Css.center
             , Css.justifyContent Css.spaceBetween
@@ -168,8 +168,8 @@ viewGameHeader model =
                 [ Css.backgroundImage
                     (Css.linearGradient2
                         Css.toRight
-                        (Css.stop (hex "efa940"))
-                        (Css.stop (hex "f0cb66"))
+                        (Css.stop (Css.hex "efa940"))
+                        (Css.stop (Css.hex "f0cb66"))
                         []
                     )
                 , Css.fontSize (px 24)
@@ -211,7 +211,7 @@ viewTable model game players currentPlayer =
             , Css.property "grid-template-rows" "max-content 1fr"
             , Css.property "grid-auto-rows" "max-content"
             , Css.property "grid-template-columns" "55px 1fr 55px"
-            , Css.margin (rem 1)
+            , Css.margin Design.spacing.medium
             ]
         ]
         [ H.div
@@ -318,11 +318,11 @@ viewPlayerInfo game player =
             (sharedStyle.player player.player
                 ++ [ Css.property "display" "grid"
                    , Css.property "grid-auto-flow" "column"
-                   , Css.property "column-gap" "1rem"
+                   , Css.property "column-gap" Design.spacing.medium.value
                    , Css.alignItems Css.center
                    , Css.padding Design.spacing.small
                    , Css.borderRadius Design.borderRadius.outer
-                   , Css.backgroundColor (Css.hsl 135.0 0.5261 0.8418)
+                   , Css.backgroundColor Design.color.lightTable
                    , Design.shadow.underscore
                    , Css.justifyContent Css.spaceBetween
                    , Css.margin Css.auto
@@ -333,13 +333,13 @@ viewPlayerInfo game player =
         [ viewPlayerTag player
         , H.span
             [ css
-                [ Svg.primaryColor Design.color.lightPrimary.string
+                [ Svg.primaryColor Design.color.lightPrimary.value
                 ]
             ]
             [ svgWithText Svg.hand (String.fromInt (List.length hand)) ]
         , H.span
             [ css
-                [ Svg.primaryColor Design.color.lightPrimary.string
+                [ Svg.primaryColor Design.color.lightPrimary.value
                 ]
             ]
             [ svgWithText Svg.stack (String.fromInt (List.length taken)) ]
@@ -352,9 +352,9 @@ viewPlayerTag player =
     H.p
         [ css
             [ Css.property "background-color" "var(--c-player)"
-            , Css.borderRadius (rem 0.25)
+            , Css.borderRadius Design.borderRadius.inner
             , Css.padding Design.spacing.xsmall
-            , Css.color Design.color.white.color
+            , Css.color Design.color.white
             , Css.lineHeight (Css.int 1)
             , Css.fontSize Design.font.large
             ]
@@ -381,7 +381,7 @@ viewPlayer model game player =
             { hand =
                 [ Css.position Css.relative
                 , Css.property "display" "grid"
-                , Css.property "row-gap" "1rem"
+                , Css.property "row-gap" Design.spacing.medium.value
                 ]
             }
     in
@@ -414,7 +414,7 @@ viewPlayerFront player ( faceUp, faceDown ) =
             H.div
                 [ css
                     [ Css.position Css.relative
-                    , Css.margin (rem 1)
+                    , Css.margin Design.spacing.medium
                     ]
                 ]
                 [ H.div
@@ -436,7 +436,7 @@ viewPlayerFront player ( faceUp, faceDown ) =
                     , H.p
                         [ css
                             [ Css.fontStyle Css.italic
-                            , Css.margin2 (rem 0.5) Css.zero
+                            , Css.margin2 Design.spacing.xsmall Css.zero
                             ]
                         ]
                         [ H.text "or" ]
@@ -475,24 +475,24 @@ viewBet bet =
             \name ->
                 H.p
                     [ css
-                        [ Css.backgroundColor (hex "555")
-                        , Css.color (hex "ffe455")
-                        , Css.padding (rem 0.5)
-                        , Css.marginLeft (rem 1.5)
-                        , Css.paddingLeft (rem 1.1)
-                        , Css.borderRadius (rem 0.25)
+                        [ Css.backgroundColor Design.color.lightestBlack
+                        , Css.color Design.color.lightPrimary
+                        , Css.padding Design.spacing.xsmall
+                        , Css.marginLeft Design.spacing.large
+                        , Css.paddingLeft Design.spacing.medium
+                        , Css.borderRadius Design.borderRadius.inner
                         , Css.lineHeight (Css.num 1)
                         , Css.position Css.relative
                         ]
                     ]
                     [ H.span
                         [ css
-                            [ Css.padding (rem 0.5)
-                            , Css.borderRadius (rem 2)
-                            , Css.border3 (px 4) Css.solid (hex "555")
+                            [ Css.padding Design.spacing.xsmall
+                            , Css.borderRadius (pct 100)
+                            , Css.border3 (px 4) Css.solid Design.color.lightestBlack
                             , Css.lineHeight (Css.num 1)
-                            , Css.backgroundColor (hex "ffe455")
-                            , Css.color (hex "555")
+                            , Css.backgroundColor Design.color.lightPrimary
+                            , Css.color Design.color.lightestBlack
                             , Css.width (rem 2.5)
                             , Css.height (rem 2.5)
                             , Css.position Css.absolute
@@ -605,15 +605,15 @@ viewFaceDownCard card =
                 ++ [ Css.backgroundImage
                         (Css.linearGradient2
                             (Css.deg 150)
-                            (Css.stop <| hex "dadada")
-                            (Css.stop2 (hex "dadada") <| pct 10)
-                            [ Css.stop2 (hex "ffd9d3") <| pct 10
-                            , Css.stop2 (hex "ffd9d3") <| pct 20
-                            , Css.stop2 (hex "d8f1d8") <| pct 20
-                            , Css.stop2 (hex "d8f1d8") <| pct 30
-                            , Css.stop2 (hex "cfdfff") <| pct 30
-                            , Css.stop2 (hex "cfdfff") <| pct 40
-                            , Css.stop2 (hex "fcf4db") <| pct 40
+                            (Css.stop <| Css.hex "dadada")
+                            (Css.stop2 (Css.hex "dadada") <| pct 10)
+                            [ Css.stop2 (Css.hex "ffd9d3") <| pct 10
+                            , Css.stop2 (Css.hex "ffd9d3") <| pct 20
+                            , Css.stop2 (Css.hex "d8f1d8") <| pct 20
+                            , Css.stop2 (Css.hex "d8f1d8") <| pct 30
+                            , Css.stop2 (Css.hex "cfdfff") <| pct 30
+                            , Css.stop2 (Css.hex "cfdfff") <| pct 40
+                            , Css.stop2 (Css.hex "fcf4db") <| pct 40
                             ]
                         )
                    ]
@@ -634,7 +634,7 @@ svgWithText svg text =
             [ css
                 [ Css.width (rem 1.5)
                 , Css.height (rem 1.5)
-                , Css.marginRight (rem 0.5)
+                , Css.marginRight Design.spacing.xsmall
                 ]
             ]
             [ svg ]
@@ -652,10 +652,10 @@ sharedStyle =
     { card =
         [ Css.width (px 100)
         , Css.height (px 150)
-        , Css.border3 (px 1) Css.solid (hex "1b1b1b")
-        , Css.boxShadow5 (px 1) (px 1) (px 10) (px -5) (hex "000")
-        , Css.borderRadius (rem 0.25)
-        , Css.backgroundColor (hex "#fff")
+        , Css.border3 (px 1) Css.solid Design.color.black
+        , Design.shadow.lowest
+        , Css.borderRadius Design.borderRadius.inner
+        , Css.backgroundColor Design.color.white
         ]
     , cardList =
         [ Css.displayFlex

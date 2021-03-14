@@ -73,7 +73,7 @@ viewContent : Html Msg
 viewContent =
     div
         [ css
-            [ backgroundColor color.table.color
+            [ backgroundColor color.table
             , padding spacing.large
             , property "display" "grid"
             , property "row-gap" "2rem"
@@ -95,24 +95,24 @@ viewColors =
                 [ displayFlex
                 ]
             ]
-            [ viewColor color.black.color
-            , viewColor color.lightBlack.color
-            , viewColor color.lightestBlack.color
-            , viewColor color.darkestGray.color
-            , viewColor color.darkGray.color
-            , viewColor color.gray.color
-            , viewColor color.lightGray.color
-            , viewColor color.lightestGray.color
-            , viewColor color.offWhite.color
-            , viewColor color.white.color
+            [ viewColor color.black
+            , viewColor color.lightBlack
+            , viewColor color.lightestBlack
+            , viewColor color.darkestGray
+            , viewColor color.darkGray
+            , viewColor color.gray
+            , viewColor color.lightGray
+            , viewColor color.lightestGray
+            , viewColor color.offWhite
+            , viewColor color.white
             ]
         , div
             [ css [ displayFlex ] ]
-            [ viewColor color.darkestPrimary.color
-            , viewColor color.darkPrimary.color
-            , viewColor color.primary.color
-            , viewColor color.lightPrimary.color
-            , viewColor color.lightestPrimary.color
+            [ viewColor color.darkestPrimary
+            , viewColor color.darkPrimary
+            , viewColor color.primary
+            , viewColor color.lightPrimary
+            , viewColor color.lightestPrimary
             ]
         ]
 
@@ -125,7 +125,7 @@ viewColor value =
             , height (px 32)
             , backgroundColor value
             , margin spacing.medium
-            , boxShadow5 inset zero zero (px 2) color.black.color
+            , boxShadow5 inset zero zero (px 2) color.black
             , Css.borderRadius borderRadius.inner
             ]
         ]
@@ -172,7 +172,7 @@ viewShadow name shadow =
             [ shadow
             , width (px 100)
             , height (px 100)
-            , backgroundColor color.lightGray.color
+            , backgroundColor color.lightGray
             ]
         ]
         [ text name ]
@@ -199,7 +199,7 @@ viewSvg svg =
         [ css
             [ width (px 60)
             , height (px 60)
-            , border3 (px 2) solid color.lightestGray.color
+            , border3 (px 2) solid color.lightestGray
             ]
         ]
         [ svg ]
