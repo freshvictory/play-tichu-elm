@@ -134,7 +134,7 @@ viewGame model =
     let
         style =
             { game =
-                [ Css.backgroundColor Design.color.table
+                [ Css.backgroundColor Design.color.table.color
                 , Css.height (pct 100)
                 , Css.property "display" "grid"
                 , Css.property "grid-template-rows" "max-content 1fr"
@@ -333,11 +333,16 @@ viewPlayerInfo game player =
         [ viewPlayerTag player
         , H.span
             [ css
-                [ Css.color Design.color.lightPrimary
+                [ Svg.primaryColor Design.color.lightPrimary.string
                 ]
             ]
             [ svgWithText Svg.hand (String.fromInt (List.length hand)) ]
-        , svgWithText Svg.stack (String.fromInt (List.length taken))
+        , H.span
+            [ css
+                [ Svg.primaryColor Design.color.lightPrimary.string
+                ]
+            ]
+            [ svgWithText Svg.stack (String.fromInt (List.length taken)) ]
         , viewBet (Players.get player.player game.bets)
         ]
 
@@ -349,7 +354,7 @@ viewPlayerTag player =
             [ Css.property "background-color" "var(--c-player)"
             , Css.borderRadius (rem 0.25)
             , Css.padding Design.spacing.xsmall
-            , Css.color Design.color.white
+            , Css.color Design.color.white.color
             , Css.lineHeight (Css.int 1)
             , Css.fontSize Design.font.large
             ]

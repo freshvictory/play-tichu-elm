@@ -43,12 +43,12 @@ borderRadius =
 
 shadow : { lowest : Css.Style, low : Css.Style, middle : Css.Style, high : Css.Style, highest : Css.Style, underscore : Css.Style }
 shadow =
-    { lowest = Css.boxShadow4 (px 1) (px 1) (px 3) color.darkestGray
-    , low = Css.boxShadow4 (px 3) (px 3) (px 6) color.darkestGray
-    , middle = Css.boxShadow4 (px 5) (px 5) (px 15) color.darkestGray
-    , high = Css.boxShadow4 (px 10) (px 10) (px 24) color.darkestGray
-    , highest = Css.boxShadow4 (px 15) (px 15) (px 35) color.darkestGray
-    , underscore = Css.boxShadow4 Css.zero (px 2) (px 6) color.darkestGray
+    { lowest = Css.boxShadow4 (px 1) (px 1) (px 3) color.darkestGray.color
+    , low = Css.boxShadow4 (px 3) (px 3) (px 6) color.darkestGray.color
+    , middle = Css.boxShadow4 (px 5) (px 5) (px 15) color.darkestGray.color
+    , high = Css.boxShadow4 (px 10) (px 10) (px 24) color.darkestGray.color
+    , highest = Css.boxShadow4 (px 15) (px 15) (px 35) color.darkestGray.color
+    , underscore = Css.boxShadow4 Css.zero (px 2) (px 6) color.darkestGray.color
     }
 
 
@@ -56,29 +56,42 @@ focus : Css.Style
 focus =
     Css.focus
         [ Css.outline Css.none
-        , Css.boxShadow5 Css.zero Css.zero (px 2) (px 3) color.focus
+        , Css.boxShadow5 Css.zero Css.zero (px 2) (px 3) color.focus.color
         ]
 
 
-color : { black : Css.Color, lightBlack : Css.Color, lightestBlack : Css.Color, darkestGray : Css.Color, darkGray : Css.Color, gray : Css.Color, lightGray : Css.Color, lightestGray : Css.Color, offWhite : Css.Color, white : Css.Color, darkestPrimary : Css.Color, darkPrimary : Css.Color, primary : Css.Color, lightPrimary : Css.Color, lightestPrimary : Css.Color, table : Css.Color, focus : Css.Color }
+colorDefinition : ( Float, Float, Float ) -> { color : Css.Color, string : String }
+colorDefinition ( h, s, l ) =
+    { color = hsl h s l
+    , string =
+        "hsl("
+            ++ String.fromFloat h
+            ++ ", "
+            ++ String.fromFloat (s * 100)
+            ++ "%, "
+            ++ String.fromFloat (l * 100)
+            ++ "%)"
+    }
+
+
 color =
-    { black = hsl 43 0.21 0.067
-    , lightBlack = hsl 42 0.16 0.133
-    , lightestBlack = hsl 39 0.15 0.267
-    , darkestGray = hsl 39 0.13 0.4
-    , darkGray = hsl 39 0.12 0.533
-    , gray = hsl 39 0.12 0.667
-    , lightGray = hsl 39 0.13 0.733
-    , lightestGray = hsl 39 0.15 0.8
-    , offWhite = hsl 39 0.16 0.867
-    , white = hsl 39 0.21 0.937
-    , darkestPrimary = hsl 38 1 0.48
-    , darkPrimary = hsl 41 1 0.58
-    , primary = hsl 44 1 0.68
-    , lightPrimary = hsl 47 1 0.78
-    , lightestPrimary = hsl 50 1 0.88
-    , table = hsl 135 0.5 0.5
-    , focus = hsl 194 0.94 0.25
+    { black = colorDefinition ( 43, 0.21, 0.067 )
+    , lightBlack = colorDefinition ( 42, 0.16, 0.133 )
+    , lightestBlack = colorDefinition ( 39, 0.15, 0.267 )
+    , darkestGray = colorDefinition ( 39, 0.13, 0.4 )
+    , darkGray = colorDefinition ( 39, 0.12, 0.533 )
+    , gray = colorDefinition ( 39, 0.12, 0.667 )
+    , lightGray = colorDefinition ( 39, 0.13, 0.733 )
+    , lightestGray = colorDefinition ( 39, 0.15, 0.8 )
+    , offWhite = colorDefinition ( 39, 0.16, 0.867 )
+    , white = colorDefinition ( 39, 0.21, 0.937 )
+    , darkestPrimary = colorDefinition ( 38, 1, 0.48 )
+    , darkPrimary = colorDefinition ( 41, 1, 0.58 )
+    , primary = colorDefinition ( 44, 1, 0.68 )
+    , lightPrimary = colorDefinition ( 47, 1, 0.78 )
+    , lightestPrimary = colorDefinition ( 50, 1, 0.88 )
+    , table = colorDefinition ( 135, 0.5, 0.5 )
+    , focus = colorDefinition ( 194, 0.94, 0.25 )
     }
 
 
@@ -93,12 +106,12 @@ button =
                         ([ Css.fontSize font.regular
                          , Css.fontVariant Css.smallCaps
                          , Css.borderRadius borderRadius.inner
-                         , Css.border3 (px 2) Css.solid color.lightBlack
+                         , Css.border3 (px 2) Css.solid color.lightBlack.color
                          , Css.padding spacing.xsmall
-                         , Css.color color.black
+                         , Css.color color.black.color
                          , shadow.lowest
                          , focus
-                         , Css.Transitions.transition [ Css.Transitions.backgroundColor 150 ]
+                         , Css.Transitions.transition [ Css.Transitions.backgroundColor 100 ]
                          ]
                             ++ styles
                         )
@@ -110,12 +123,12 @@ button =
             baseButton
                 text
                 msg
-                ([ Css.backgroundColor color.primary
+                ([ Css.backgroundColor color.primary.color
                  , Css.hover
-                    [ Css.backgroundColor color.lightPrimary
+                    [ Css.backgroundColor color.lightPrimary.color
                     ]
                  , Css.active
-                    [ Css.backgroundColor color.lightestPrimary
+                    [ Css.backgroundColor color.lightestPrimary.color
                     ]
                  ]
                     ++ styles
@@ -125,12 +138,12 @@ button =
             baseButton
                 text
                 msg
-                ([ Css.backgroundColor color.lightestGray
+                ([ Css.backgroundColor color.lightestGray.color
                  , Css.hover
-                    [ Css.backgroundColor color.offWhite
+                    [ Css.backgroundColor color.offWhite.color
                     ]
                  , Css.active
-                    [ Css.backgroundColor color.white
+                    [ Css.backgroundColor color.white.color
                     ]
                  ]
                     ++ styles

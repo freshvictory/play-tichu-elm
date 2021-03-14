@@ -1,94 +1,67 @@
 module Svg exposing (..)
 
+import Css
 import Svg.Styled as Svg exposing (Svg, svg)
 import Svg.Styled.Attributes as A
+
+
+primaryColor : String -> Css.Style
+primaryColor color =
+    Css.property "--c-svg-primary" color
+
+
+secondaryColor : String -> Css.Style
+secondaryColor color =
+    Css.property "--c-svg-secondary" color
+
+
+card : ( Float, Float, Float ) -> Svg msg
+card ( x, y, rotate ) =
+    Svg.rect
+        [ A.x "0"
+        , A.y "0"
+        , A.width "30"
+        , A.height "45"
+        , A.rx "3"
+        , A.css
+            [ Css.property "transform-origin" "15px 15px"
+            , Css.transforms
+                [ Css.translateX (Css.px x)
+                , Css.translateY (Css.px y)
+                , Css.rotateZ (Css.deg rotate)
+                ]
+            ]
+        , A.fill "var(--c-svg-primary, #fff)"
+        , A.stroke "var(--c-svg-secondary, #000)"
+        , A.strokeMiterlimit "10"
+        , A.strokeWidth "2px"
+        ]
+        []
 
 
 hand : Svg msg
 hand =
     svg
-        [ A.viewBox "0 0 58.5 54.5"
+        [ A.viewBox "0 0 60 60"
         ]
-        [ Svg.rect
-            [ A.x "6.6"
-            , A.y "6.78"
-            , A.width "27.05"
-            , A.height "47.15"
-            , A.rx "3"
-            , A.transform "translate(-8.41 2.69) rotate(-15.83)"
-            , A.fill "currentColor"
-            , A.stroke "#000"
-            , A.strokeMiterlimit "10"
-            , A.strokeWidth "3px"
+        (List.map
+            card
+            [ ( 4, 7.5, -15 )
+            , ( 15, 4, 0 )
+            , ( 26, 7.5, 15 )
             ]
-            []
-        , Svg.rect
-            [ A.x "15.55"
-            , A.y "2"
-            , A.width "27.05"
-            , A.height "47.15"
-            , A.rx "3"
-            , A.fill "currentColor"
-            , A.stroke "#000"
-            , A.strokeMiterlimit "10"
-            , A.strokeWidth "3px"
-            ]
-            []
-        , Svg.rect
-            [ A.x "15.39"
-            , A.y "18.49"
-            , A.width "47.15"
-            , A.height "27.05"
-            , A.rx "3"
-            , A.transform "translate(-5.33 53.73) rotate(-70)"
-            , A.fill "currentColor"
-            , A.stroke "#000"
-            , A.strokeMiterlimit "10"
-            , A.strokeWidth "3px"
-            ]
-            []
-        ]
+        )
 
 
 stack : Svg msg
 stack =
     svg
-        [ A.viewBox "0 0 56 58"
+        [ A.viewBox "0 0 60 60"
         ]
-        [ Svg.rect
-            [ A.x "6.5"
-            , A.y "1.5"
-            , A.width "27"
-            , A.height "47"
-            , A.rx "3"
-            , A.fill "currentColor"
-            , A.stroke "#000"
-            , A.strokeMiterlimit "10"
-            , A.strokeWidth "3px"
+        (List.map
+            card
+            [ ( 8, 1, 0 )
+            , ( 15, 7.5, 0 )
+            , ( 22, 14, 0 )
             ]
-            []
-        , Svg.rect
-            [ A.x "14.5"
-            , A.y "5.5"
-            , A.width "27"
-            , A.height "47"
-            , A.rx "3"
-            , A.fill "currentColor"
-            , A.stroke "#000"
-            , A.strokeMiterlimit "10"
-            , A.strokeWidth "3px"
-            ]
-            []
-        , Svg.rect
-            [ A.x "22.5"
-            , A.y "9.5"
-            , A.width "27"
-            , A.height "47"
-            , A.rx "3"
-            , A.fill "currentColor"
-            , A.stroke "#000"
-            , A.strokeMiterlimit "10"
-            , A.strokeWidth "3px"
-            ]
-            []
-        ]
+        )

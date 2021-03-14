@@ -1,6 +1,6 @@
 module Page.Design exposing (Model, Msg, init, update, view)
 
-import Css exposing (Color, Style, backgroundColor, boxShadow5, displayFlex, height, inset, margin, padding, property, px, width, zero)
+import Css exposing (Color, Style, backgroundColor, border3, boxShadow5, displayFlex, height, inset, margin, padding, property, px, solid, width, zero)
 import Design exposing (borderRadius, button, color, shadow, spacing)
 import Html.Styled
     exposing
@@ -10,8 +10,10 @@ import Html.Styled
         , nav
         , text
         )
+import Html.Styled.Attributes exposing (css)
 import Page
-import Svg.Styled.Attributes exposing (css)
+import Svg
+import Svg.Styled exposing (Svg)
 
 
 
@@ -48,7 +50,7 @@ update msg model =
 
 view : Model -> Page.Details Msg
 view model =
-    { title = "Home"
+    { title = "Design"
     , attrs = []
     , body =
         [ viewHeader
@@ -71,7 +73,7 @@ viewContent : Html Msg
 viewContent =
     div
         [ css
-            [ backgroundColor color.table
+            [ backgroundColor color.table.color
             , padding spacing.large
             , property "display" "grid"
             , property "row-gap" "2rem"
@@ -80,6 +82,7 @@ viewContent =
         [ viewColors
         , viewButtons
         , viewShadows
+        , viewSvgs
         ]
 
 
@@ -92,24 +95,24 @@ viewColors =
                 [ displayFlex
                 ]
             ]
-            [ viewColor color.black
-            , viewColor color.lightBlack
-            , viewColor color.lightestBlack
-            , viewColor color.darkestGray
-            , viewColor color.darkGray
-            , viewColor color.gray
-            , viewColor color.lightGray
-            , viewColor color.lightestGray
-            , viewColor color.offWhite
-            , viewColor color.white
+            [ viewColor color.black.color
+            , viewColor color.lightBlack.color
+            , viewColor color.lightestBlack.color
+            , viewColor color.darkestGray.color
+            , viewColor color.darkGray.color
+            , viewColor color.gray.color
+            , viewColor color.lightGray.color
+            , viewColor color.lightestGray.color
+            , viewColor color.offWhite.color
+            , viewColor color.white.color
             ]
         , div
             [ css [ displayFlex ] ]
-            [ viewColor color.darkestPrimary
-            , viewColor color.darkPrimary
-            , viewColor color.primary
-            , viewColor color.lightPrimary
-            , viewColor color.lightestPrimary
+            [ viewColor color.darkestPrimary.color
+            , viewColor color.darkPrimary.color
+            , viewColor color.primary.color
+            , viewColor color.lightPrimary.color
+            , viewColor color.lightestPrimary.color
             ]
         ]
 
@@ -122,7 +125,7 @@ viewColor value =
             , height (px 32)
             , backgroundColor value
             , margin spacing.medium
-            , boxShadow5 inset zero zero (px 2) color.black
+            , boxShadow5 inset zero zero (px 2) color.black.color
             , Css.borderRadius borderRadius.inner
             ]
         ]
@@ -169,7 +172,34 @@ viewShadow name shadow =
             [ shadow
             , width (px 100)
             , height (px 100)
-            , backgroundColor color.lightGray
+            , backgroundColor color.lightGray.color
             ]
         ]
         [ text name ]
+
+
+viewSvgs : Html Msg
+viewSvgs =
+    div
+        [ css
+            [ property "display" "grid"
+            , property "grid-auto-flow" "column"
+            , property "grid-auto-columns" "max-content"
+            , property "grid-column-gap" "1rem"
+            ]
+        ]
+        [ viewSvg Svg.hand
+        , viewSvg Svg.stack
+        ]
+
+
+viewSvg : Svg Msg -> Html Msg
+viewSvg svg =
+    div
+        [ css
+            [ width (px 60)
+            , height (px 60)
+            , border3 (px 2) solid color.lightestGray.color
+            ]
+        ]
+        [ svg ]
