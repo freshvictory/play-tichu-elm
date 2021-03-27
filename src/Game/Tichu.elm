@@ -33,7 +33,9 @@ type Combination
 
 
 type Action
-    = PassCards Player ( Card, Card, Card )
+    = PassCards Player
+    | MarkForPass Player Card Player
+    | TakeBackPass Player Card
     | PickUp Player
     | CallGrandTichu Player
     | CallTichu Player
@@ -113,7 +115,17 @@ act action game =
                         , cards = cardsAfterAction
                     }
 
-                PassCards player _ ->
+                MarkForPass _ _ _ ->
+                    { game
+                        | cards = cardsAfterAction
+                    }
+
+                TakeBackPass _ _ ->
+                    { game
+                        | cards = cardsAfterAction
+                    }
+
+                PassCards player ->
                     let
                         playersWhovePassed =
                             Players.filter
@@ -229,20 +241,29 @@ cardAction action =
                 )
                 (Cards.PlayerLocation Cards.Hand player)
 
-        PassCards passer ( toPartner, toNext, toPrevious ) ->
+        MarkForPass passer card passee ->
+            Cards.MoveCards
+                (\c -> c.definition.id == card.id)
+                (Cards.PlayerLocation (Cards.PassingTo passee) passer)
+
+        TakeBackPass passer card ->
+            Cards.MoveCards
+                (\c -> c.definition.id == card.id)
+                (Cards.PlayerLocation Cards.Hand passer)
+
+        PassCards passer ->
             Cards.MapCards
                 (\card ->
-                    if card.definition.id == toPartner.id then
-                        Cards.PlayerLocation (Cards.PassingTo (Players.partner passer)) passer
+                    case card.location of
+                        Cards.PlayerLocation (Cards.PassingTo passee) maybeThisPasser ->
+                            if maybeThisPasser == passer then
+                                Cards.PlayerLocation (Cards.PassedTo passee) passer
 
-                    else if card.definition.id == toNext.id then
-                        Cards.PlayerLocation (Cards.PassingTo (Players.next passer)) passer
+                            else
+                                card.location
 
-                    else if card.definition.id == toPrevious.id then
-                        Cards.PlayerLocation (Cards.PassingTo (Players.previous passer)) passer
-
-                    else
-                        card.location
+                        _ ->
+                            card.location
                 )
 
         Play player combination ->
@@ -283,7 +304,7 @@ cardAction action =
             Cards.MapCards
                 (\card ->
                     case card.location of
-                        Cards.PlayerLocation (Cards.PassingTo passee) _ ->
+                        Cards.PlayerLocation (Cards.PassedTo passee) _ ->
                             Cards.PlayerLocation Cards.Hand passee
 
                         _ ->

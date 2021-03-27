@@ -41,7 +41,6 @@ borderRadius =
     }
 
 
-shadow : { lowest : Css.Style, low : Css.Style, middle : Css.Style, high : Css.Style, highest : Css.Style, underscore : Css.Style }
 shadow =
     { lowest = Css.boxShadow4 (px 1) (px 1) (px 3) color.darkestGray
     , low = Css.boxShadow4 (px 3) (px 3) (px 6) color.darkestGray
@@ -49,6 +48,8 @@ shadow =
     , high = Css.boxShadow4 (px 10) (px 10) (px 24) color.darkestGray
     , highest = Css.boxShadow4 (px 15) (px 15) (px 35) color.darkestGray
     , underscore = Css.boxShadow4 Css.zero (px 2) (px 6) color.darkestGray
+    , focus = Css.boxShadow5 Css.zero Css.zero (px 2) (px 3) color.focus
+    , hover = Css.boxShadow5 Css.zero Css.zero Css.zero (px 3) color.primary
     }
 
 
@@ -56,7 +57,7 @@ focus : Css.Style
 focus =
     Css.focus
         [ Css.outline Css.none
-        , Css.boxShadow5 Css.zero Css.zero (px 2) (px 3) color.focus
+        , shadow.focus
         ]
 
 
@@ -78,61 +79,72 @@ color =
     , lightestPrimary = hsl 50 1 0.88
     , table = hsl 135 0.5 0.5
     , lightTable = hsl 135 0.5 0.85
+    , lightestTable = hsl 135 1 0.94
     , focus = hsl 194 0.94 0.25
     }
 
 
-button : { primary : String -> b -> List Css.Style -> Html b, secondary : String -> a -> List Css.Style -> Html a }
 button =
     let
         baseButton =
-            \text msg styles ->
+            \text msg attributes ->
                 H.button
-                    [ E.onClick msg
-                    , css
-                        ([ Css.fontSize font.regular
-                         , Css.fontVariant Css.smallCaps
-                         , Css.borderRadius borderRadius.inner
-                         , Css.border3 (px 2) Css.solid color.lightBlack
-                         , Css.padding spacing.xsmall
-                         , Css.color color.black
-                         , shadow.lowest
-                         , focus
-                         , Css.Transitions.transition [ Css.Transitions.backgroundColor 100 ]
-                         ]
-                            ++ styles
-                        )
-                    ]
+                    (attributes
+                        ++ [ E.onClick msg
+                           , css
+                                [ Css.fontSize font.regular
+                                , Css.fontVariant Css.smallCaps
+                                , Css.borderRadius borderRadius.inner
+                                , Css.border3 (px 2) Css.solid color.lightBlack
+                                , Css.padding spacing.xsmall
+                                , Css.whiteSpace Css.noWrap
+                                , shadow.lowest
+                                , focus
+                                , Css.Transitions.transition [ Css.Transitions.backgroundColor 100 ]
+                                , Css.disabled
+                                    [ Css.opacity (Css.num 0.7)
+                                    , Css.pointerEvents Css.none
+                                    ]
+                                ]
+                           ]
+                    )
                     [ H.text text ]
     in
     { primary =
-        \text msg styles ->
+        \text msg attributes ->
             baseButton
                 text
                 msg
-                ([ Css.backgroundColor color.primary
-                 , Css.hover
-                    [ Css.backgroundColor color.lightPrimary
+                (css
+                    [ Css.backgroundColor color.primary
+                    , Css.color color.black
+                    , Css.hover
+                        [ Css.backgroundColor color.lightPrimary
+                        ]
+                    , Css.active
+                        [ Css.backgroundColor color.lightestPrimary
+                        ]
                     ]
-                 , Css.active
-                    [ Css.backgroundColor color.lightestPrimary
-                    ]
-                 ]
-                    ++ styles
+                    :: attributes
                 )
     , secondary =
-        \text msg styles ->
+        \text msg attributes ->
             baseButton
                 text
                 msg
-                ([ Css.backgroundColor color.lightestGray
-                 , Css.hover
-                    [ Css.backgroundColor color.offWhite
+                (css
+                    [ Css.backgroundColor color.lightestGray
+                    , Css.color color.black
+                    , Css.hover
+                        [ Css.backgroundColor color.offWhite
+                        ]
+                    , Css.active
+                        [ Css.backgroundColor color.white
+                        ]
                     ]
-                 , Css.active
-                    [ Css.backgroundColor color.white
-                    ]
-                 ]
-                    ++ styles
+                    :: attributes
                 )
+    , custom =
+        \text msg attributes ->
+            baseButton text msg attributes
     }

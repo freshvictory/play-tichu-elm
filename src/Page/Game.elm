@@ -16,6 +16,7 @@ import Random
 import Set exposing (Set)
 import Svg
 import Svg.Styled exposing (Svg)
+import Svg.Styled.Attributes exposing (in_)
 
 
 
@@ -39,7 +40,7 @@ type alias Model =
     , deck : Cards.PlayableDeck Tichu.Suit
     , game : Game Tichu.Suit
     , currentPlayers : Players GamePlayer
-    , selectedCards : Set String
+    , selectedCards : Players (Set String)
     }
 
 
@@ -59,7 +60,7 @@ init gameId =
       , deck = Cards.buildDeck Tichu.deckDefinition
       , game = Undealt
       , currentPlayers = currentPlayers
-      , selectedCards = Set.empty
+      , selectedCards = Players.all Set.empty
       }
     , Cmd.none
     )
@@ -74,7 +75,7 @@ type Msg
     | Shuffle
     | DeckShuffled (Cards.Deck Tichu.Suit)
     | Action Tichu.Action
-    | ToggleCard String Bool
+    | ToggleCard Player String Bool
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -87,7 +88,12 @@ update msg model =
             ( model, shuffleDeck model.deck.deck )
 
         DeckShuffled cards ->
-            ( { model | game = Dealt (Tichu.newGame (model.deck.deal cards)), selectedCards = Set.empty }, Cmd.none )
+            ( { model
+                | game = Dealt (Tichu.newGame (model.deck.deal cards))
+                , selectedCards = Players.all Set.empty
+              }
+            , Cmd.none
+            )
 
         Action action ->
             case model.game of
@@ -95,16 +101,29 @@ update msg model =
                     ( model, Cmd.none )
 
                 Dealt game ->
-                    ( { model | game = Dealt (Tichu.act action game) }, Cmd.none )
+                    case action of
+                        Tichu.MarkForPass player card _ ->
+                            ( { model
+                                | game = Dealt (Tichu.act action game)
+                                , selectedCards = Players.set player (Set.remove card.id (Players.get player model.selectedCards)) model.selectedCards
+                              }
+                            , Cmd.none
+                            )
 
-        ToggleCard id checked ->
+                        _ ->
+                            ( { model | game = Dealt (Tichu.act action game) }, Cmd.none )
+
+        ToggleCard player id checked ->
             ( { model
                 | selectedCards =
-                    if checked then
-                        Set.insert id model.selectedCards
+                    Players.set player
+                        (if checked then
+                            Set.insert id (Players.get player model.selectedCards)
 
-                    else
-                        Set.remove id model.selectedCards
+                         else
+                            Set.remove id (Players.get player model.selectedCards)
+                        )
+                        model.selectedCards
               }
             , Cmd.none
             )
@@ -146,7 +165,7 @@ viewGame model =
         [ viewGameHeader model
         , case model.game of
             Dealt game ->
-                viewTable model game model.currentPlayers (Just South)
+                viewTable model game model.currentPlayers (Just North)
 
             Undealt ->
                 H.text ""
@@ -221,7 +240,7 @@ viewTable model game players currentPlayer =
                 , Css.justifyContent Css.spaceAround
                 ]
             ]
-            [ viewPlayerInfo game (Players.get order.top players) ]
+            [ viewPlayerInfo game (Players.get order.top players) currentPlayer 0 ]
         , H.div
             [ css
                 [ Css.property "grid-area" "left"
@@ -238,7 +257,7 @@ viewTable model game players currentPlayer =
                     , Css.transform (Css.rotate (Css.deg -90))
                     ]
                 ]
-                [ viewPlayerInfo game (Players.get order.left players) ]
+                [ viewPlayerInfo game (Players.get order.left players) currentPlayer -90 ]
             ]
         , H.div
             [ css
@@ -256,14 +275,51 @@ viewTable model game players currentPlayer =
                     , Css.transform (Css.rotate (Css.deg 90))
                     ]
                 ]
-                [ viewPlayerInfo game (Players.get order.right players) ]
+                [ viewPlayerInfo game (Players.get order.right players) currentPlayer 90 ]
             ]
         , H.div
             [ css
                 [ Css.property "grid-area" "table"
                 ]
             ]
-            [ viewCardsInPlay game players ]
+            [ case game.phase of
+                Tichu.PreGame _ ->
+                    case currentPlayer of
+                        Just current ->
+                            let
+                                cardsPassed =
+                                    List.length
+                                        (Cards.selectFromMultiple
+                                            [ Cards.PlayerLocation (Cards.PassingTo (Players.partner current)) current
+                                            , Cards.PlayerLocation (Cards.PassingTo (Players.next current)) current
+                                            , Cards.PlayerLocation (Cards.PassingTo (Players.previous current)) current
+                                            ]
+                                            game.cards
+                                        )
+                            in
+                            if cardsPassed == 3 then
+                                Design.button.primary
+                                    "Confirm pass"
+                                    (Action (Tichu.PassCards current))
+                                    [ css
+                                        [ Css.position Css.absolute
+                                        , Css.left (pct 50)
+                                        , Css.top (pct 50)
+                                        , Css.transforms
+                                            [ Css.translate2 (pct -50) (pct -50)
+                                            ]
+                                        ]
+                                    ]
+
+                            else
+                                H.text ""
+
+                        Nothing ->
+                            H.text ""
+
+                _ ->
+                    viewCardsInPlay game players
+            ]
         , H.div
             [ css
                 [ Css.property "grid-area" "me" ]
@@ -273,7 +329,7 @@ viewTable model game players currentPlayer =
                     viewPlayer model game (Players.get p players)
 
                 Nothing ->
-                    viewPlayerInfo game (Players.get order.bottom players)
+                    viewPlayerInfo game (Players.get order.bottom players) currentPlayer 0
             ]
         ]
 
@@ -304,8 +360,8 @@ viewCardsInPlay game players =
         )
 
 
-viewPlayerInfo : Tichu.Game -> GamePlayer -> Html Msg
-viewPlayerInfo game player =
+viewPlayerInfo : Tichu.Game -> GamePlayer -> Maybe Player -> Float -> Html Msg
+viewPlayerInfo game player currentPlayer rotation =
     let
         hand =
             Cards.selectFrom (Cards.PlayerLocation Cards.Hand player.player) game.cards
@@ -315,20 +371,20 @@ viewPlayerInfo game player =
     in
     H.div
         [ css
-            (sharedStyle.player player.player
-                ++ [ Css.property "display" "grid"
-                   , Css.property "grid-auto-flow" "column"
-                   , Css.property "column-gap" Design.spacing.medium.value
-                   , Css.alignItems Css.center
-                   , Css.padding Design.spacing.small
-                   , Css.borderRadius Design.borderRadius.outer
-                   , Css.backgroundColor Design.color.lightTable
-                   , Design.shadow.underscore
-                   , Css.justifyContent Css.spaceBetween
-                   , Css.margin Css.auto
-                   , Css.property "width" "max-content"
-                   ]
-            )
+            [ Css.property "display" "grid"
+            , Css.property "grid-auto-flow" "column"
+            , Css.property "column-gap" Design.spacing.medium.value
+            , Css.alignItems Css.center
+            , sharedStyle.player player.player
+            , Css.padding Design.spacing.small
+            , Css.borderRadius Design.borderRadius.outer
+            , Css.backgroundColor Design.color.lightTable
+            , Design.shadow.underscore
+            , Css.justifyContent Css.spaceBetween
+            , Css.margin Css.auto
+            , Css.property "width" "max-content"
+            , Css.position Css.relative
+            ]
         ]
         [ viewPlayerTag player
         , H.span
@@ -344,6 +400,27 @@ viewPlayerInfo game player =
             ]
             [ svgWithText Svg.stack (String.fromInt (List.length taken)) ]
         , viewBet (Players.get player.player game.bets)
+        , case currentPlayer of
+            Just current ->
+                case game.phase of
+                    Tichu.PreGame _ ->
+                        let
+                            cardPassed =
+                                List.head
+                                    (Cards.selectFrom (Cards.PlayerLocation (Cards.PassingTo player.player) current) game.cards)
+                        in
+                        case cardPassed of
+                            Just card ->
+                                viewPassedCard game current card rotation
+
+                            Nothing ->
+                                H.text ""
+
+                    _ ->
+                        H.text ""
+
+            Nothing ->
+                H.text ""
         ]
 
 
@@ -400,8 +477,137 @@ viewPlayer model game player =
                 H.text ""
         , H.div
             [ css style.hand ]
-            [ viewPlayerInfo game player
-            , viewHand hand model.selectedCards
+            [ viewPlayerInfo game player Nothing 0
+            , viewHand model game player hand viewSelectedCard
+            ]
+        ]
+
+
+viewSelectedCard : Model -> Tichu.Game -> GamePlayer -> Cards.Card Tichu.Suit -> Html Msg
+viewSelectedCard model game player card =
+    case game.phase of
+        Tichu.PreGame state ->
+            case Players.get player.player state of
+                Tichu.PickedUp ->
+                    viewPassDialog model game player card
+
+                _ ->
+                    H.text ""
+
+        _ ->
+            H.text ""
+
+
+viewPassDialog : Model -> Tichu.Game -> GamePlayer -> Cards.Card Tichu.Suit -> Html Msg
+viewPassDialog model game player card =
+    let
+        cardPassed =
+            \p ->
+                List.head
+                    (Cards.selectFrom (Cards.PlayerLocation (Cards.PassingTo p) player.player) game.cards)
+
+        partner =
+            Players.partner player.player
+
+        left =
+            Players.next player.player
+
+        right =
+            Players.previous player.player
+
+        playerButton =
+            \p label ->
+                let
+                    name =
+                        (Players.get p model.currentPlayers).name
+                in
+                H.li
+                    [ css
+                        [ sharedStyle.player p
+                        , Css.property "grid-area" label
+                        , Css.margin2 Design.spacing.small Css.zero
+                        , Css.lastChild [ Css.marginBottom Css.zero ]
+                        ]
+                    ]
+                    [ Design.button.custom
+                        name
+                        (Action (Tichu.MarkForPass player.player card p))
+                        [ css
+                            [ Css.property "background-color" "var(--c-player)"
+                            , Css.color Design.color.white
+                            , Css.width (pct 100)
+                            , Css.disabled
+                                [ Css.opacity (Css.num 0.5)
+                                ]
+                            , Css.active
+                                [ Css.backgroundColor Design.color.gray
+                                ]
+                            ]
+                        , A.disabled (cardPassed p /= Nothing)
+                        ]
+                    ]
+    in
+    H.div
+        [ css
+            [ Css.position Css.absolute
+            , Css.bottom (Css.calc (pct 100) Css.plus Design.spacing.xlarge)
+            , Css.left (pct 50)
+            , Css.transform (Css.translateX (pct -50))
+            , Css.backgroundColor Design.color.lightestTable
+            , Css.borderRadius Design.borderRadius.middle
+            , Css.padding Design.spacing.small
+            , Css.minWidth (px 175)
+            , Design.shadow.middle
+            ]
+        ]
+        [ H.h2
+            [ css
+                [ Css.fontSize Design.font.large
+                , Css.textAlign Css.center
+                , Css.fontStyle Css.italic
+                , Css.marginBottom Design.spacing.xsmall
+                , Css.paddingBottom Design.spacing.xxsmall
+                , Css.fontWeight Css.normal
+                , Css.borderBottom3 (px 1) Css.solid Design.color.darkGray
+                ]
+            ]
+            [ H.text "Pass this card" ]
+        , H.ol
+            [ css
+                []
+            ]
+            [ playerButton partner "Partner"
+            , playerButton left "Left"
+            , playerButton right "Right"
+            ]
+        ]
+
+
+viewPassedCard : Tichu.Game -> Player -> Cards.Card Tichu.Suit -> Float -> Html Msg
+viewPassedCard game player card rotation =
+    H.div
+        [ css
+            [ Css.position Css.absolute
+            , Css.left (pct 50)
+            , Css.transforms
+                [ Css.translateX (pct -50)
+                , Css.rotateZ (Css.deg -rotation)
+                ]
+            , Css.top (Css.calc (pct 100) Css.plus Design.spacing.medium)
+            ]
+        ]
+        [ viewCard card
+        , Design.button.secondary
+            "Take Back"
+            (Action (Tichu.TakeBackPass player card))
+            [ css
+                [ Css.position Css.absolute
+                , Css.left (pct 50)
+                , Css.top (Css.calc (pct 100) Css.plus Design.spacing.small)
+                , Css.transforms
+                    [ Css.translateX (pct -50)
+                    ]
+                ]
             ]
         ]
 
@@ -431,7 +637,7 @@ viewPlayerFront player ( faceUp, faceDown ) =
                     [ Design.button.primary
                         "Pick up"
                         (Action (Tichu.PickUp player))
-                        [ Css.width (pct 100)
+                        [ css [ Css.width (pct 100) ]
                         ]
                     , H.p
                         [ css
@@ -463,9 +669,9 @@ viewPlayerFront player ( faceUp, faceDown ) =
         ]
 
 
-viewHand : List (Cards.Card Tichu.Suit) -> Set String -> Html Msg
-viewHand hand selectedCards =
-    viewCardList hand selectedCards
+viewHand : Model -> Tichu.Game -> GamePlayer -> List (Cards.Card Tichu.Suit) -> (Model -> Tichu.Game -> GamePlayer -> Cards.Card Tichu.Suit -> Html Msg) -> Html Msg
+viewHand model game player hand viewSelected =
+    viewCardList model game player hand viewSelected
 
 
 viewBet : Tichu.Bet -> Html Msg
@@ -520,11 +726,14 @@ viewBet bet =
             H.text ""
 
 
-viewCardList : List (Cards.Card Tichu.Suit) -> Set String -> Html Msg
-viewCardList cards selectedCards =
+viewCardList : Model -> Tichu.Game -> GamePlayer -> List (Cards.Card Tichu.Suit) -> (Model -> Tichu.Game -> GamePlayer -> Cards.Card Tichu.Suit -> Html Msg) -> Html Msg
+viewCardList model game player cards viewSelected =
     let
         sortedCards =
             List.sortBy (\c -> c.rank) cards
+
+        selectedCards =
+            Players.get player.player model.selectedCards
     in
     Keyed.node
         "ol"
@@ -535,7 +744,11 @@ viewCardList cards selectedCards =
                 , lazy
                     (\c ->
                         H.li
-                            [ css sharedStyle.cardListItem ]
+                            [ css
+                                (sharedStyle.cardListItem
+                                    ++ [ Css.position Css.relative ]
+                                )
+                            ]
                             [ H.label
                                 [ css
                                     [ Css.display Css.block
@@ -552,7 +765,7 @@ viewCardList cards selectedCards =
                                 [ H.input
                                     [ A.type_ "checkbox"
                                     , A.checked (Set.member c.id selectedCards)
-                                    , E.onCheck (ToggleCard c.id)
+                                    , E.onCheck (ToggleCard player.player c.id)
                                     , css
                                         [ Css.display Css.none
                                         ]
@@ -560,6 +773,11 @@ viewCardList cards selectedCards =
                                     []
                                 , viewCard c
                                 ]
+                            , if Set.member c.id selectedCards then
+                                viewSelected model game player c
+
+                              else
+                                H.text ""
                             ]
                     )
                     card
@@ -574,13 +792,8 @@ viewCard card =
     H.div
         [ css
             (sharedStyle.card
-                ++ [ Css.position Css.relative
-                   , Css.Transitions.transition
-                        [ Css.Transitions.transform3 80 0 Css.Transitions.easeIn ]
-                   , Css.hover
-                        [ Css.transforms [ Css.translateY (px -10), Css.scale 1.05 ]
-                        , Css.Transitions.transition
-                            [ Css.Transitions.transform3 100 0 Css.Transitions.easeOut ]
+                ++ [ Css.hover
+                        [ Design.shadow.hover
                         ]
                    ]
             )
@@ -686,6 +899,5 @@ sharedStyle =
                         West ->
                             "west"
             in
-            [ Css.property "--c-player" ("var(--c-" ++ playerString ++ ")")
-            ]
+            Css.property "--c-player" ("var(--c-" ++ playerString ++ ")")
     }

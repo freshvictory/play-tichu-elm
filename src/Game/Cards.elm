@@ -1,4 +1,4 @@
-module Game.Cards exposing (ActionResult(..), Card, CardState(..), Cards, Deal, Deck, Location(..), PlayableDeck, PlayableDeckDefinition, PlayedLocation(..), PlayerLocation(..), act, buildDeck, byPlay, findById, selectFrom, shuffle)
+module Game.Cards exposing (ActionResult(..), Card, CardState(..), Cards, Deal, Deck, Location(..), PlayableDeck, PlayableDeckDefinition, PlayedLocation(..), PlayerLocation(..), act, buildDeck, byPlay, findById, selectFrom, selectFromMultiple, shuffle)
 
 import Array exposing (Array)
 import Dict exposing (Dict)
@@ -44,6 +44,7 @@ type PlayerLocation
     | Taken
     | InFront CardState
     | PassingTo Player
+    | PassedTo Player
 
 
 type PlayedLocation
@@ -80,6 +81,19 @@ selectFrom location (Cards cards _) =
     List.filterMap
         (\card ->
             if card.location == location then
+                Just card.definition
+
+            else
+                Nothing
+        )
+        cards
+
+
+selectFromMultiple : List Location -> Cards suit -> List (Card suit)
+selectFromMultiple locations (Cards cards _) =
+    List.filterMap
+        (\card ->
+            if List.member card.location locations then
                 Just card.definition
 
             else
@@ -149,7 +163,15 @@ play player cardsToPlay location (Cards cards plays) =
 
 move : List (Card suit) -> Location -> Cards suit -> Cards suit
 move cardsToMove newLocation cards =
-    moveInternal cardsToMove newLocation cards
+    mapCards
+        (\card ->
+            if List.member card.definition cardsToMove then
+                newLocation
+
+            else
+                card.location
+        )
+        cards
 
 
 moveInternal : List (Card suit) -> Location -> Cards suit -> Cards suit
