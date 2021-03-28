@@ -468,6 +468,62 @@ viewPlayer model info =
         , H.div
             [ css style.hand ]
             [ viewPlayerInfo model info Nothing 0
+            , case info.cards of
+                Tichu.Playing _ ->
+                    let
+                        selectedCardIds =
+                            Players.get info.table.self model.selectedCards
+
+                        selectedCards =
+                            List.filter (\c -> Set.member c.id selectedCardIds) info.hand
+
+                        combination =
+                            case Tichu.determineCombination selectedCards of
+                                Tichu.Single _ ->
+                                    "Single"
+
+                                Tichu.Pair _ ->
+                                    "Pair"
+
+                                Tichu.Triple _ ->
+                                    "Triple"
+
+                                Tichu.ConsecutivePairs _ ->
+                                    "Consecutive Pairs"
+
+                                Tichu.Straight _ ->
+                                    "Straight"
+
+                                Tichu.Bomb bomb ->
+                                    case bomb of
+                                        Tichu.FourOfAKind _ ->
+                                            "Four of a Kind Bomb"
+
+                                        Tichu.StraightFlush _ ->
+                                            "Straight Flush Bomb"
+
+                                Tichu.Irregular _ ->
+                                    "Unknown"
+                    in
+                    if not (Set.isEmpty selectedCardIds) then
+                        H.div
+                            [ css
+                                [ Css.margin Css.auto
+                                , Css.displayFlex
+                                , Css.flexDirection Css.column
+                                ]
+                            ]
+                            [ Design.button.primary
+                                ("Play " ++ combination)
+                                (Action (Tichu.Play info.table.self selectedCards))
+                                []
+                            ]
+
+                    else
+                        H.text ""
+
+                _ ->
+                    H.text ""
             , viewHand model info viewSelectedCard
             ]
         ]

@@ -1,4 +1,23 @@
-module Game.Tichu exposing (Action(..), Bet(..), Combination(..), Game, PassChoices, Phase(..), PlayerInfo, PlayingState(..), PreGamePlayerInfo(..), PreGameState(..), Suit(..), act, deckDefinition, getPlayersInfo, newGame)
+module Game.Tichu exposing
+    ( Action(..)
+    , Bet(..)
+    , Bomb(..)
+    , Combination(..)
+    , Game
+    , PassChoices
+    , Phase(..)
+    , PlayerInfo
+    , PlayingState(..)
+    , PreGamePlayerInfo(..)
+    , PreGameState(..)
+    , Suit(..)
+    , act
+    , deckDefinition
+    , determineCombination
+    , getPlayersInfo
+    , isPlayValid
+    , newGame
+    )
 
 import Game.Cards as Cards exposing (Cards)
 import Game.Players as Players exposing (Player(..), Players)
@@ -26,9 +45,10 @@ type Combination
     = Single Card
     | Pair ( Card, Card )
     | Triple ( Card, Card, Card )
-    | ConsecutivePairs (List ( Card, Card ))
+    | ConsecutivePairs (List Card)
     | Straight (List Card)
     | Bomb Bomb
+    | Irregular (List Card)
 
 
 type Action
@@ -38,7 +58,7 @@ type Action
     | PickUp Player
     | CallGrandTichu Player
     | CallTichu Player
-    | Play Player Combination
+    | Play Player (List Card)
     | Pass Player
     | TakeTrick Player
     | GiveDragon Player
@@ -274,7 +294,7 @@ act action game =
 
         Playing state ->
             case action of
-                Play player combination ->
+                Play player cards ->
                     { game
                         | phase = Playing (Players.set player Idle state)
                     }
@@ -352,38 +372,10 @@ cardAction action =
                             card.location
                 )
 
-        Play player combination ->
-            let
-                cardsInCombination =
-                    case combination of
-                        Single singleCard ->
-                            [ singleCard ]
-
-                        Pair ( firstCard, secondCard ) ->
-                            [ firstCard, secondCard ]
-
-                        Triple ( firstCard, secondCard, thirdCard ) ->
-                            [ firstCard, secondCard, thirdCard ]
-
-                        ConsecutivePairs cards ->
-                            List.concatMap
-                                (\( firstCard, secondCard ) -> [ firstCard, secondCard ])
-                                cards
-
-                        Straight cards ->
-                            cards
-
-                        Bomb bomb ->
-                            case bomb of
-                                StraightFlush cards ->
-                                    cards
-
-                                FourOfAKind cards ->
-                                    cards
-            in
+        Play player cards ->
             Cards.PlayCards
                 player
-                cardsInCombination
+                cards
                 Cards.Table
 
         EveryonePickUp ->
@@ -436,6 +428,346 @@ cardAction action =
 
         Wish _ ->
             Cards.NoOp
+
+
+type PlayError
+    = NotHigher
+    | WrongCombination
+    | WrongNumberOfCards
+    | Invalid
+
+
+isPlayValid : Combination -> Combination -> Result PlayError ()
+isPlayValid first second =
+    case ( first, second ) of
+        ( Single firstCard, Single secondCard ) ->
+            compareCombinations [ firstCard ] [ secondCard ]
+
+        ( Pair ( firstPair, _ ), Pair ( secondPair, _ ) ) ->
+            compareCombinations [ firstPair ] [ secondPair ]
+
+        ( Triple ( firstTriple, _, _ ), Triple ( secondTriple, _, _ ) ) ->
+            compareCombinations [ firstTriple ] [ secondTriple ]
+
+        ( ConsecutivePairs firstCards, ConsecutivePairs secondCards ) ->
+            compareCombinations firstCards secondCards
+
+        ( Straight firstCards, Straight secondCards ) ->
+            compareCombinations firstCards secondCards
+
+        ( Bomb firstBomb, Bomb secondBomb ) ->
+            case ( firstBomb, secondBomb ) of
+                ( FourOfAKind firstFour, FourOfAKind secondFour ) ->
+                    compareCombinations firstFour secondFour
+
+                ( StraightFlush firstFlush, StraightFlush secondFlush ) ->
+                    if List.length secondFlush > List.length firstFlush then
+                        Ok ()
+
+                    else
+                        compareCombinations firstFlush secondFlush
+
+                ( FourOfAKind _, StraightFlush _ ) ->
+                    Ok ()
+
+                ( StraightFlush _, FourOfAKind _ ) ->
+                    Err NotHigher
+
+        ( _, Bomb _ ) ->
+            Ok ()
+
+        ( _, Irregular _ ) ->
+            Err Invalid
+
+        _ ->
+            Err WrongCombination
+
+
+compareCombinations : List Card -> List Card -> Result PlayError ()
+compareCombinations firstCards secondCards =
+    if List.length secondCards /= List.length firstCards then
+        Err WrongNumberOfCards
+
+    else
+        let
+            firstLowest =
+                List.head firstCards
+
+            secondLowest =
+                List.head secondCards
+        in
+        case ( firstLowest, secondLowest ) of
+            ( Just firstStart, Just secondStart ) ->
+                if firstStart.id == "phoenix" then
+                    Ok ()
+
+                else if secondStart.rank > firstStart.rank then
+                    Ok ()
+
+                else
+                    Err NotHigher
+
+            _ ->
+                Err WrongCombination
+
+
+determineCombination : List Card -> Combination
+determineCombination cards =
+    let
+        sortedCards =
+            List.sortBy .rank cards
+
+        maybeCombination =
+            case sortedCards of
+                [] ->
+                    Nothing
+
+                [ c ] ->
+                    Maybe.map Single (parseSingle c)
+
+                [ c1, c2 ] ->
+                    Maybe.map Pair (parsePair c1 c2)
+
+                [ c1, c2, c3 ] ->
+                    Maybe.map Triple (parseTriple c1 c2 c3)
+
+                [ c1, c2, c3, c4 ] ->
+                    parseQuadruple c1 c2 c3 c4
+
+                c :: cs ->
+                    case parseStraight c cs of
+                        Just combination ->
+                            Just combination
+
+                        Nothing ->
+                            Maybe.map ConsecutivePairs (parseConsecutive (c :: cs))
+    in
+    Maybe.withDefault (Irregular cards) maybeCombination
+
+
+parseSingle : Card -> Maybe Card
+parseSingle card =
+    if card.id == "dog" then
+        Nothing
+
+    else
+        Just card
+
+
+parsePair : Card -> Card -> Maybe ( Card, Card )
+parsePair c1 c2 =
+    if c1.rank == c2.rank then
+        Just ( c1, c2 )
+
+    else if c1.id == "phoenix" then
+        Just ( c2, c1 )
+
+    else if c2.id == "phoenix" then
+        Just ( c1, c2 )
+
+    else
+        Nothing
+
+
+parseTriple : Card -> Card -> Card -> Maybe ( Card, Card, Card )
+parseTriple c1 c2 c3 =
+    let
+        formTriple =
+            \( one, two ) ( _, three ) ->
+                ( one, two, three )
+    in
+    Maybe.map2 formTriple (parsePair c1 c2) (parsePair c2 c3)
+
+
+parseQuadruple : Card -> Card -> Card -> Card -> Maybe Combination
+parseQuadruple c1 c2 c3 c4 =
+    case parseFourCardBomb c1 c2 c3 c4 of
+        Just cards ->
+            Just (Bomb (FourOfAKind cards))
+
+        Nothing ->
+            Maybe.map ConsecutivePairs (parseConsecutive [ c1, c2, c3, c4 ])
+
+
+parseFourCardBomb : Card -> Card -> Card -> Card -> Maybe (List Card)
+parseFourCardBomb c1 c2 c3 c4 =
+    let
+        list =
+            [ c1, c2, c3, c4 ]
+    in
+    if List.all (\c -> c.rank == c1.rank) list then
+        Just list
+
+    else
+        Nothing
+
+
+parseConsecutive : List Card -> Maybe (List Card)
+parseConsecutive cards =
+    if modBy 2 (List.length cards) /= 0 then
+        Nothing
+
+    else
+        let
+            containsPhoenix =
+                not (List.isEmpty (List.filter (\c -> c.id == "phoenix") cards))
+
+            validCards =
+                List.isEmpty (List.filter (\c -> c.id == "dragon" || c.id == "dog") cards)
+        in
+        if not validCards then
+            Nothing
+
+        else
+            case cards of
+                first :: rest ->
+                    let
+                        ( isConsecutive, phoenixUsedAt ) =
+                            testConsecutive first rest False containsPhoenix 0
+                    in
+                    if isConsecutive then
+                        let
+                            orderedWithPhoenix =
+                                orderWithPhoenix phoenixUsedAt cards
+                        in
+                        Just orderedWithPhoenix
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+
+
+testConsecutive : Card -> List Card -> Bool -> Bool -> Int -> ( Bool, Int )
+testConsecutive first rest foundTheOther canUsePhoenix depth =
+    case rest of
+        [] ->
+            ( True, depth )
+
+        x :: xs ->
+            let
+                usedPhoenixAt =
+                    if canUsePhoenix then
+                        depth + 1
+
+                    else
+                        depth
+            in
+            if x.id == "phoenix" then
+                testConsecutive first xs False canUsePhoenix usedPhoenixAt
+
+            else if first.id == "phoenix" then
+                testConsecutive x xs False canUsePhoenix usedPhoenixAt
+
+            else if x.rank == first.rank + 1 then
+                if foundTheOther then
+                    testConsecutive x xs False canUsePhoenix usedPhoenixAt
+
+                else if canUsePhoenix then
+                    testConsecutive x xs False False usedPhoenixAt
+
+                else
+                    ( False, depth )
+
+            else if x.rank == first.rank then
+                if not foundTheOther then
+                    testConsecutive x xs True canUsePhoenix usedPhoenixAt
+
+                else
+                    ( False, depth )
+
+            else
+                ( False, depth )
+
+
+parseStraight : Card -> List Card -> Maybe Combination
+parseStraight first rest =
+    let
+        cards =
+            first :: rest
+
+        maybeBomb =
+            List.all (\c -> c.suit == first.suit) rest
+
+        containsPhoenix =
+            not (List.isEmpty (List.filter (\c -> c.id == "phoenix") cards))
+
+        validCards =
+            List.isEmpty (List.filter (\c -> c.id == "dragon" || c.id == "dog") cards)
+    in
+    if not validCards then
+        Nothing
+
+    else
+        let
+            ( isStraight, phoenixUsedAt ) =
+                testStraight first rest containsPhoenix 0
+        in
+        if isStraight && maybeBomb then
+            Just (Bomb (StraightFlush cards))
+
+        else if isStraight then
+            let
+                orderedWithPhoenix =
+                    orderWithPhoenix phoenixUsedAt cards
+            in
+            Just (Straight orderedWithPhoenix)
+
+        else
+            Nothing
+
+
+testStraight : Card -> List Card -> Bool -> Int -> ( Bool, Int )
+testStraight first rest canUsePhoenix depth =
+    case rest of
+        [] ->
+            ( True, depth )
+
+        x :: xs ->
+            let
+                usedPhoenixAt =
+                    if canUsePhoenix then
+                        depth + 1
+
+                    else
+                        depth
+            in
+            if x.id == "phoenix" then
+                testStraight first xs canUsePhoenix usedPhoenixAt
+
+            else if first.id == "phoenix" then
+                testStraight x xs canUsePhoenix usedPhoenixAt
+
+            else if x.rank == first.rank + 1 then
+                testStraight x xs canUsePhoenix usedPhoenixAt
+
+            else if x.rank == first.rank + 2 && canUsePhoenix then
+                testStraight x xs False usedPhoenixAt
+
+            else
+                ( False, depth )
+
+
+orderWithPhoenix : Int -> List Card -> List Card
+orderWithPhoenix phoenixUsedAt cards =
+    let
+        phoenix =
+            List.head (List.filter (\c -> c.id == "phoenix") cards)
+
+        cardsWithoutPhoenix =
+            List.filter (\c -> c.id /= "phoenix") cards
+
+        orderedWithPhoenix =
+            case phoenix of
+                Just p ->
+                    List.take phoenixUsedAt cardsWithoutPhoenix
+                        ++ (p :: List.drop phoenixUsedAt cardsWithoutPhoenix)
+
+                Nothing ->
+                    cards
+    in
+    orderedWithPhoenix
 
 
 deck : Cards.Deck Suit
