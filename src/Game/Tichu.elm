@@ -12,6 +12,7 @@ module Game.Tichu exposing
     , PreGameState(..)
     , Suit(..)
     , act
+    , cardsInCombination
     , deckDefinition
     , determineCombination
     , getPlayersInfo
@@ -58,7 +59,7 @@ type Action
     | PickUp Player
     | CallGrandTichu Player
     | CallTichu Player
-    | Play Player (List Card)
+    | Play Player Combination
     | Pass Player
     | TakeTrick Player
     | GiveDragon Player
@@ -294,9 +295,10 @@ act action game =
 
         Playing state ->
             case action of
-                Play player cards ->
+                Play player _ ->
                     { game
                         | phase = Playing (Players.set player Idle state)
+                        , cards = cardsAfterAction
                     }
 
                 Pass player ->
@@ -372,10 +374,10 @@ cardAction action =
                             card.location
                 )
 
-        Play player cards ->
+        Play player combination ->
             Cards.PlayCards
                 player
-                cards
+                (cardsInCombination combination)
                 Cards.Table
 
         EveryonePickUp ->
@@ -509,6 +511,34 @@ compareCombinations firstCards secondCards =
 
             _ ->
                 Err WrongCombination
+
+
+cardsInCombination : Combination -> List Card
+cardsInCombination combination =
+    case combination of
+        Single card ->
+            [ card ]
+
+        Pair ( c1, c2 ) ->
+            [ c1, c2 ]
+
+        Triple ( c1, c2, c3 ) ->
+            [ c1, c2, c3 ]
+
+        ConsecutivePairs cards ->
+            cards
+
+        Straight cards ->
+            cards
+
+        Bomb (FourOfAKind cards) ->
+            cards
+
+        Bomb (StraightFlush cards) ->
+            cards
+
+        Irregular cards ->
+            cards
 
 
 determineCombination : List Card -> Combination
@@ -734,7 +764,11 @@ testStraight first rest canUsePhoenix depth =
                         depth
             in
             if x.id == "phoenix" then
-                testStraight first xs canUsePhoenix usedPhoenixAt
+                if first.rank == 14 then
+                    testStraight first xs False 0
+
+                else
+                    testStraight first xs canUsePhoenix usedPhoenixAt
 
             else if first.id == "phoenix" then
                 testStraight x xs canUsePhoenix usedPhoenixAt

@@ -109,6 +109,14 @@ update msg model =
                             , Cmd.none
                             )
 
+                        Tichu.Play player cards ->
+                            ( { model
+                                | game = Dealt (Tichu.act action game)
+                                , selectedCards = Players.set player Set.empty model.selectedCards
+                              }
+                            , Cmd.none
+                            )
+
                         _ ->
                             ( { model | game = Dealt (Tichu.act action game) }, Cmd.none )
 
@@ -164,7 +172,7 @@ viewGame model =
         [ viewGameHeader model
         , case model.game of
             Dealt game ->
-                viewTable model game (Just North)
+                viewTable model game (Just East)
 
             Undealt ->
                 H.text ""
@@ -313,7 +321,12 @@ viewTable model game currentPlayer =
                                 H.text ""
 
                         _ ->
-                            H.text ""
+                            case game.phase of
+                                Tichu.PreGame _ ->
+                                    H.text ""
+
+                                Tichu.Playing playingState ->
+                                    viewCardsInPlay game playingState
 
                 Nothing ->
                     case game.phase of
@@ -347,6 +360,13 @@ viewCardsInPlay game players =
         []
         (List.map
             (\( player, cardsInPlay ) ->
+                let
+                    combination =
+                        Tichu.determineCombination cardsInPlay
+
+                    cards =
+                        Tichu.cardsInCombination combination
+                in
                 H.ol
                     [ css sharedStyle.cardList ]
                     (List.map
@@ -356,7 +376,7 @@ viewCardsInPlay game players =
                                 [ viewCard card
                                 ]
                         )
-                        cardsInPlay
+                        cards
                     )
             )
             cardsOnTable
@@ -478,7 +498,10 @@ viewPlayer model info =
                             List.filter (\c -> Set.member c.id selectedCardIds) info.hand
 
                         combination =
-                            case Tichu.determineCombination selectedCards of
+                            Tichu.determineCombination selectedCards
+
+                        combinationText =
+                            case combination of
                                 Tichu.Single _ ->
                                     "Single"
 
@@ -514,8 +537,8 @@ viewPlayer model info =
                                 ]
                             ]
                             [ Design.button.primary
-                                ("Play " ++ combination)
-                                (Action (Tichu.Play info.table.self selectedCards))
+                                ("Play " ++ combinationText)
+                                (Action (Tichu.Play info.table.self combination))
                                 []
                             ]
 
