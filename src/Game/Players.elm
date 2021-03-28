@@ -1,4 +1,4 @@
-module Game.Players exposing (Player(..), Players, all, filter, fromMap, get, next, partner, previous, set)
+module Game.Players exposing (Player(..), Players, all, filter, fromMap, get, left, partner, right, set)
 
 import Html exposing (a)
 import List
@@ -27,8 +27,8 @@ partner player =
             East
 
 
-next : Player -> Player
-next player =
+left : Player -> Player
+left player =
     case player of
         North ->
             East
@@ -43,8 +43,8 @@ next player =
             North
 
 
-previous : Player -> Player
-previous player =
+right : Player -> Player
+right player =
     case player of
         North ->
             West

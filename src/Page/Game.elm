@@ -16,7 +16,6 @@ import Random
 import Set exposing (Set)
 import Svg
 import Svg.Styled exposing (Svg)
-import Svg.Styled.Attributes exposing (in_)
 
 
 
@@ -165,7 +164,7 @@ viewGame model =
         [ viewGameHeader model
         , case model.game of
             Dealt game ->
-                viewTable model game model.currentPlayers (Just North)
+                viewTable model game (Just North)
 
             Undealt ->
                 H.text ""
@@ -199,16 +198,22 @@ viewGameHeader model =
         ]
 
 
-viewTable : Model -> Tichu.Game -> Players GamePlayer -> Maybe Player -> Html Msg
-viewTable model game players currentPlayer =
+viewTable : Model -> Tichu.Game -> Maybe Player -> Html Msg
+viewTable model game currentPlayer =
     let
+        playersInfo =
+            Tichu.getPlayersInfo game
+
+        currentPlayerInfo =
+            Maybe.map (\p -> Players.get p playersInfo) currentPlayer
+
         order =
             case currentPlayer of
                 Just p ->
                     { top = Players.partner p
-                    , left = Players.next p
+                    , left = Players.left p
                     , bottom = p
-                    , right = Players.previous p
+                    , right = Players.right p
                     }
 
                 Nothing ->
@@ -240,7 +245,7 @@ viewTable model game players currentPlayer =
                 , Css.justifyContent Css.spaceAround
                 ]
             ]
-            [ viewPlayerInfo game (Players.get order.top players) currentPlayer 0 ]
+            [ viewPlayerInfo model (Players.get order.top playersInfo) currentPlayerInfo 0 ]
         , H.div
             [ css
                 [ Css.property "grid-area" "left"
@@ -257,7 +262,7 @@ viewTable model game players currentPlayer =
                     , Css.transform (Css.rotate (Css.deg -90))
                     ]
                 ]
-                [ viewPlayerInfo game (Players.get order.left players) currentPlayer -90 ]
+                [ viewPlayerInfo model (Players.get order.left playersInfo) currentPlayerInfo -90 ]
             ]
         , H.div
             [ css
@@ -275,29 +280,22 @@ viewTable model game players currentPlayer =
                     , Css.transform (Css.rotate (Css.deg 90))
                     ]
                 ]
-                [ viewPlayerInfo game (Players.get order.right players) currentPlayer 90 ]
+                [ viewPlayerInfo model (Players.get order.right playersInfo) currentPlayerInfo 90 ]
             ]
         , H.div
             [ css
                 [ Css.property "grid-area" "table"
                 ]
             ]
-            [ case game.phase of
-                Tichu.PreGame _ ->
-                    case currentPlayer of
-                        Just current ->
-                            let
-                                cardsPassed =
-                                    List.length
-                                        (Cards.selectFromMultiple
-                                            [ Cards.PlayerLocation (Cards.PassingTo (Players.partner current)) current
-                                            , Cards.PlayerLocation (Cards.PassingTo (Players.next current)) current
-                                            , Cards.PlayerLocation (Cards.PassingTo (Players.previous current)) current
-                                            ]
-                                            game.cards
-                                        )
-                            in
-                            if cardsPassed == 3 then
+            [ case currentPlayer of
+                Just current ->
+                    let
+                        info =
+                            Players.get current playersInfo
+                    in
+                    case info.cards of
+                        Tichu.PreGame (Tichu.SelectingPass cardsPassed) ->
+                            if cardsPassed.left /= Nothing && cardsPassed.right /= Nothing && cardsPassed.partner /= Nothing then
                                 Design.button.primary
                                     "Confirm pass"
                                     (Action (Tichu.PassCards current))
@@ -314,11 +312,16 @@ viewTable model game players currentPlayer =
                             else
                                 H.text ""
 
-                        Nothing ->
+                        _ ->
                             H.text ""
 
-                _ ->
-                    viewCardsInPlay game players
+                Nothing ->
+                    case game.phase of
+                        Tichu.PreGame _ ->
+                            H.text ""
+
+                        Tichu.Playing playingState ->
+                            viewCardsInPlay game playingState
             ]
         , H.div
             [ css
@@ -326,15 +329,15 @@ viewTable model game players currentPlayer =
             ]
             [ case currentPlayer of
                 Just p ->
-                    viewPlayer model game (Players.get p players)
+                    viewPlayer model (Players.get p playersInfo)
 
                 Nothing ->
-                    viewPlayerInfo game (Players.get order.bottom players) currentPlayer 0
+                    viewPlayerInfo model (Players.get order.bottom playersInfo) Nothing 0
             ]
         ]
 
 
-viewCardsInPlay : Tichu.Game -> Players GamePlayer -> Html Msg
+viewCardsInPlay : Tichu.Game -> Players Tichu.PlayingState -> Html Msg
 viewCardsInPlay game players =
     let
         cardsOnTable =
@@ -360,22 +363,15 @@ viewCardsInPlay game players =
         )
 
 
-viewPlayerInfo : Tichu.Game -> GamePlayer -> Maybe Player -> Float -> Html Msg
-viewPlayerInfo game player currentPlayer rotation =
-    let
-        hand =
-            Cards.selectFrom (Cards.PlayerLocation Cards.Hand player.player) game.cards
-
-        taken =
-            Cards.selectFrom (Cards.PlayerLocation Cards.Taken player.player) game.cards
-    in
+viewPlayerInfo : Model -> Tichu.PlayerInfo -> Maybe Tichu.PlayerInfo -> Float -> Html Msg
+viewPlayerInfo model info currentPlayer rotation =
     H.div
         [ css
             [ Css.property "display" "grid"
             , Css.property "grid-auto-flow" "column"
             , Css.property "column-gap" Design.spacing.medium.value
             , Css.alignItems Css.center
-            , sharedStyle.player player.player
+            , sharedStyle.player info.table.self
             , Css.padding Design.spacing.small
             , Css.borderRadius Design.borderRadius.outer
             , Css.backgroundColor Design.color.lightTable
@@ -386,32 +382,43 @@ viewPlayerInfo game player currentPlayer rotation =
             , Css.position Css.relative
             ]
         ]
-        [ viewPlayerTag player
+        [ viewPlayerTag (Players.get info.table.self model.currentPlayers)
         , H.span
             [ css
                 [ Svg.primaryColor Design.color.lightPrimary.value
                 ]
             ]
-            [ svgWithText Svg.hand (String.fromInt (List.length hand)) ]
-        , H.span
-            [ css
-                [ Svg.primaryColor Design.color.lightPrimary.value
-                ]
-            ]
-            [ svgWithText Svg.stack (String.fromInt (List.length taken)) ]
-        , viewBet (Players.get player.player game.bets)
+            [ svgWithText Svg.hand (String.fromInt (List.length info.hand)) ]
+        , case info.cards of
+            Tichu.PreGame state ->
+                H.text ""
+
+            Tichu.Playing state ->
+                H.span
+                    [ css
+                        [ Svg.primaryColor Design.color.lightPrimary.value
+                        ]
+                    ]
+                    [ svgWithText Svg.stack (String.fromInt (List.length state.taken)) ]
+        , viewBet info.bet
         , case currentPlayer of
             Just current ->
-                case game.phase of
-                    Tichu.PreGame _ ->
+                case current.cards of
+                    Tichu.PreGame (Tichu.SelectingPass cardsPassed) ->
                         let
                             cardPassed =
-                                List.head
-                                    (Cards.selectFrom (Cards.PlayerLocation (Cards.PassingTo player.player) current) game.cards)
+                                if current.table.left == info.table.self then
+                                    cardsPassed.left
+
+                                else if current.table.partner == info.table.self then
+                                    cardsPassed.partner
+
+                                else
+                                    cardsPassed.right
                         in
                         case cardPassed of
                             Just card ->
-                                viewPassedCard game current card rotation
+                                viewPassedCard current.table.self card rotation
 
                             Nothing ->
                                 H.text ""
@@ -439,21 +446,9 @@ viewPlayerTag player =
         [ H.text player.name ]
 
 
-viewPlayer : Model -> Tichu.Game -> GamePlayer -> Html Msg
-viewPlayer model game player =
+viewPlayer : Model -> Tichu.PlayerInfo -> Html Msg
+viewPlayer model info =
     let
-        hand =
-            Cards.selectFrom (Cards.PlayerLocation Cards.Hand player.player) game.cards
-
-        faceUp =
-            Cards.selectFrom (Cards.PlayerLocation (Cards.InFront Cards.FaceUp) player.player) game.cards
-
-        faceDown =
-            Cards.selectFrom (Cards.PlayerLocation (Cards.InFront Cards.FaceDown) player.player) game.cards
-
-        taken =
-            Cards.selectFrom (Cards.PlayerLocation Cards.Taken player.player) game.cards
-
         style =
             { hand =
                 [ Css.position Css.relative
@@ -464,32 +459,27 @@ viewPlayer model game player =
     in
     H.div
         []
-        [ case game.phase of
-            Tichu.PreGame state ->
-                case Players.get player.player state of
-                    Tichu.JustDealt ->
-                        viewPlayerFront player.player ( faceUp, faceDown )
-
-                    _ ->
-                        H.text ""
+        [ case info.cards of
+            Tichu.PreGame (Tichu.LastSix cards) ->
+                viewPlayerFront info.table.self ( [], cards )
 
             _ ->
                 H.text ""
         , H.div
             [ css style.hand ]
-            [ viewPlayerInfo game player Nothing 0
-            , viewHand model game player hand viewSelectedCard
+            [ viewPlayerInfo model info Nothing 0
+            , viewHand model info viewSelectedCard
             ]
         ]
 
 
-viewSelectedCard : Model -> Tichu.Game -> GamePlayer -> Cards.Card Tichu.Suit -> Html Msg
-viewSelectedCard model game player card =
-    case game.phase of
+viewSelectedCard : Model -> Tichu.PlayerInfo -> Cards.Card Tichu.Suit -> Html Msg
+viewSelectedCard model info card =
+    case info.cards of
         Tichu.PreGame state ->
-            case Players.get player.player state of
-                Tichu.PickedUp ->
-                    viewPassDialog model game player card
+            case state of
+                Tichu.SelectingPass cards ->
+                    viewPassDialog model info cards card
 
                 _ ->
                     H.text ""
@@ -498,25 +488,11 @@ viewSelectedCard model game player card =
             H.text ""
 
 
-viewPassDialog : Model -> Tichu.Game -> GamePlayer -> Cards.Card Tichu.Suit -> Html Msg
-viewPassDialog model game player card =
+viewPassDialog : Model -> Tichu.PlayerInfo -> Tichu.PassChoices -> Cards.Card Tichu.Suit -> Html Msg
+viewPassDialog model info cardsPassed card =
     let
-        cardPassed =
-            \p ->
-                List.head
-                    (Cards.selectFrom (Cards.PlayerLocation (Cards.PassingTo p) player.player) game.cards)
-
-        partner =
-            Players.partner player.player
-
-        left =
-            Players.next player.player
-
-        right =
-            Players.previous player.player
-
         playerButton =
-            \p label ->
+            \p cardPassed label ->
                 let
                     name =
                         (Players.get p model.currentPlayers).name
@@ -531,7 +507,7 @@ viewPassDialog model game player card =
                     ]
                     [ Design.button.custom
                         name
-                        (Action (Tichu.MarkForPass player.player card p))
+                        (Action (Tichu.MarkForPass info.table.self card p))
                         [ css
                             [ Css.property "background-color" "var(--c-player)"
                             , Css.color Design.color.white
@@ -543,7 +519,7 @@ viewPassDialog model game player card =
                                 [ Css.backgroundColor Design.color.gray
                                 ]
                             ]
-                        , A.disabled (cardPassed p /= Nothing)
+                        , A.disabled (cardPassed /= Nothing)
                         ]
                     ]
     in
@@ -576,15 +552,15 @@ viewPassDialog model game player card =
             [ css
                 []
             ]
-            [ playerButton partner "Partner"
-            , playerButton left "Left"
-            , playerButton right "Right"
+            [ playerButton info.table.partner cardsPassed.partner "Partner"
+            , playerButton info.table.left cardsPassed.left "Left"
+            , playerButton info.table.right cardsPassed.right "Right"
             ]
         ]
 
 
-viewPassedCard : Tichu.Game -> Player -> Cards.Card Tichu.Suit -> Float -> Html Msg
-viewPassedCard game player card rotation =
+viewPassedCard : Player -> Cards.Card Tichu.Suit -> Float -> Html Msg
+viewPassedCard player card rotation =
     H.div
         [ css
             [ Css.position Css.absolute
@@ -669,9 +645,9 @@ viewPlayerFront player ( faceUp, faceDown ) =
         ]
 
 
-viewHand : Model -> Tichu.Game -> GamePlayer -> List (Cards.Card Tichu.Suit) -> (Model -> Tichu.Game -> GamePlayer -> Cards.Card Tichu.Suit -> Html Msg) -> Html Msg
-viewHand model game player hand viewSelected =
-    viewCardList model game player hand viewSelected
+viewHand : Model -> Tichu.PlayerInfo -> (Model -> Tichu.PlayerInfo -> Cards.Card Tichu.Suit -> Html Msg) -> Html Msg
+viewHand model info viewSelected =
+    viewCardList model info info.hand viewSelected
 
 
 viewBet : Tichu.Bet -> Html Msg
@@ -726,14 +702,14 @@ viewBet bet =
             H.text ""
 
 
-viewCardList : Model -> Tichu.Game -> GamePlayer -> List (Cards.Card Tichu.Suit) -> (Model -> Tichu.Game -> GamePlayer -> Cards.Card Tichu.Suit -> Html Msg) -> Html Msg
-viewCardList model game player cards viewSelected =
+viewCardList : Model -> Tichu.PlayerInfo -> List (Cards.Card Tichu.Suit) -> (Model -> Tichu.PlayerInfo -> Cards.Card Tichu.Suit -> Html Msg) -> Html Msg
+viewCardList model info cards viewSelected =
     let
         sortedCards =
             List.sortBy (\c -> c.rank) cards
 
         selectedCards =
-            Players.get player.player model.selectedCards
+            Players.get info.table.self model.selectedCards
     in
     Keyed.node
         "ol"
@@ -765,7 +741,7 @@ viewCardList model game player cards viewSelected =
                                 [ H.input
                                     [ A.type_ "checkbox"
                                     , A.checked (Set.member c.id selectedCards)
-                                    , E.onCheck (ToggleCard player.player c.id)
+                                    , E.onCheck (ToggleCard info.table.self c.id)
                                     , css
                                         [ Css.display Css.none
                                         ]
@@ -774,7 +750,7 @@ viewCardList model game player cards viewSelected =
                                 , viewCard c
                                 ]
                             , if Set.member c.id selectedCards then
-                                viewSelected model game player c
+                                viewSelected model info c
 
                               else
                                 H.text ""

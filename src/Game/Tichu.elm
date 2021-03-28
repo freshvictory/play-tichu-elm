@@ -1,8 +1,7 @@
-module Game.Tichu exposing (Action(..), Bet(..), Combination(..), Game, Phase(..), PlayingState(..), PreGameState(..), Suit(..), act, deckDefinition, newGame)
+module Game.Tichu exposing (Action(..), Bet(..), Combination(..), Game, PassChoices, Phase(..), PlayerInfo, PlayingState(..), PreGamePlayerInfo(..), PreGameState(..), Suit(..), act, deckDefinition, getPlayersInfo, newGame)
 
 import Game.Cards as Cards exposing (Cards)
 import Game.Players as Players exposing (Player(..), Players)
-import Html exposing (a)
 import List
 
 
@@ -47,19 +46,9 @@ type Action
     | EveryonePickUp
 
 
-
--- type PlayerAction
---     = Pass Cards.Player Card
---     | PickUp
---     | CallGrandTichu
---     | CallTichu
---     | Wish Int
---     | Play Combination
-
-
-type Phase
-    = PreGame (Players PreGameState)
-    | Playing (Players PlayingState)
+type Phase a b
+    = PreGame a
+    | Playing b
 
 
 type PreGameState
@@ -86,7 +75,7 @@ type Bet
 
 
 type alias Game =
-    { phase : Phase
+    { phase : Phase (Players PreGameState) (Players PlayingState)
     , cards : Cards Suit
     , bets : Players Bet
     }
@@ -97,6 +86,103 @@ newGame cards =
     { phase = PreGame (Players.all JustDealt)
     , cards = cards
     , bets = Players.all None
+    }
+
+
+type alias PlayerInfo =
+    { table : { self : Player, partner : Player, left : Player, right : Player }
+    , bet : Bet
+    , hand : List Card
+    , cards : Phase PreGamePlayerInfo PlayingPlayerInfo
+    }
+
+
+type alias PassChoices =
+    { partner : Maybe Card
+    , left : Maybe Card
+    , right : Maybe Card
+    }
+
+
+type PreGamePlayerInfo
+    = LastSix (List Card)
+    | SelectingPass PassChoices
+    | DonePassing
+
+
+type alias PlayingPlayerInfo =
+    { taken : List Card
+    , activePlays : List Int
+    }
+
+
+getPlayersInfo : Game -> Players PlayerInfo
+getPlayersInfo game =
+    Players.fromMap
+        { north = getPlayerInfo North game
+        , south = getPlayerInfo South game
+        , east = getPlayerInfo East game
+        , west = getPlayerInfo West game
+        }
+
+
+getPlayerInfo : Player -> Game -> PlayerInfo
+getPlayerInfo player game =
+    let
+        table =
+            { self = player
+            , partner = Players.partner player
+            , left = Players.left player
+            , right = Players.right player
+            }
+
+        bet =
+            Players.get player game.bets
+
+        hand =
+            Cards.selectFrom (Cards.PlayerLocation Cards.Hand player) game.cards
+
+        faceDown =
+            Cards.selectFrom (Cards.PlayerLocation (Cards.InFront Cards.FaceDown) player) game.cards
+
+        taken =
+            Cards.selectFrom (Cards.PlayerLocation Cards.Taken player) game.cards
+
+        cards =
+            case game.phase of
+                PreGame preGameState ->
+                    PreGame
+                        (case Players.get player preGameState of
+                            JustDealt ->
+                                LastSix faceDown
+
+                            PickedUp ->
+                                let
+                                    cardPassed =
+                                        \p ->
+                                            List.head
+                                                (Cards.selectFrom (Cards.PlayerLocation (Cards.PassingTo p) player) game.cards)
+                                in
+                                SelectingPass
+                                    { partner = cardPassed table.partner
+                                    , left = cardPassed table.left
+                                    , right = cardPassed table.right
+                                    }
+
+                            PassedCards ->
+                                DonePassing
+                        )
+
+                Playing playingState ->
+                    Playing
+                        { taken = taken
+                        , activePlays = []
+                        }
+    in
+    { table = table
+    , bet = bet
+    , hand = hand
+    , cards = cards
     }
 
 
