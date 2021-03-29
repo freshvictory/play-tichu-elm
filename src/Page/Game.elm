@@ -109,7 +109,7 @@ update msg model =
                             , Cmd.none
                             )
 
-                        Tichu.Play player cards ->
+                        Tichu.Play player _ _ ->
                             ( { model
                                 | game = Dealt (Tichu.act action game)
                                 , selectedCards = Players.set player Set.empty model.selectedCards
@@ -361,11 +361,8 @@ viewCardsInPlay game players =
         (List.map
             (\( player, cardsInPlay ) ->
                 let
-                    combination =
+                    ( combination, cards ) =
                         Tichu.determineCombination cardsInPlay
-
-                    cards =
-                        Tichu.cardsInCombination combination
                 in
                 H.ol
                     [ css sharedStyle.cardList ]
@@ -497,35 +494,38 @@ viewPlayer model info =
                         selectedCards =
                             List.filter (\c -> Set.member c.id selectedCardIds) info.hand
 
-                        combination =
+                        ( combination, cardsInCombination ) =
                             Tichu.determineCombination selectedCards
 
                         combinationText =
                             case combination of
-                                Tichu.Single _ ->
+                                Tichu.Dog ->
+                                    "Dog"
+
+                                Tichu.Single ->
                                     "Single"
 
-                                Tichu.Pair _ ->
+                                Tichu.Pair ->
                                     "Pair"
 
-                                Tichu.Triple _ ->
+                                Tichu.Triple ->
                                     "Triple"
 
-                                Tichu.ConsecutivePairs _ ->
+                                Tichu.ConsecutivePairs ->
                                     "Consecutive Pairs"
 
-                                Tichu.Straight _ ->
+                                Tichu.Straight ->
                                     "Straight"
 
                                 Tichu.Bomb bomb ->
                                     case bomb of
-                                        Tichu.FourOfAKind _ ->
+                                        Tichu.FourOfAKind ->
                                             "Four of a Kind Bomb"
 
-                                        Tichu.StraightFlush _ ->
+                                        Tichu.StraightFlush ->
                                             "Straight Flush Bomb"
 
-                                Tichu.Irregular _ ->
+                                Tichu.Irregular ->
                                     "Unknown"
                     in
                     if not (Set.isEmpty selectedCardIds) then
@@ -538,7 +538,7 @@ viewPlayer model info =
                             ]
                             [ Design.button.primary
                                 ("Play " ++ combinationText)
-                                (Action (Tichu.Play info.table.self combination))
+                                (Action (Tichu.Play info.table.self combination cardsInCombination))
                                 []
                             ]
 

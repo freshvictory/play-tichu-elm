@@ -12,7 +12,7 @@ module Game.Tichu exposing
     , PreGameState(..)
     , Suit(..)
     , act
-    , cardsInCombination
+    , cardDefinition
     , deckDefinition
     , determineCombination
     , getPlayersInfo
@@ -38,18 +38,19 @@ type alias Card =
 
 
 type Bomb
-    = StraightFlush (List Card)
-    | FourOfAKind (List Card)
+    = StraightFlush
+    | FourOfAKind
 
 
 type Combination
-    = Single Card
-    | Pair ( Card, Card )
-    | Triple ( Card, Card, Card )
-    | ConsecutivePairs (List Card)
-    | Straight (List Card)
+    = Single
+    | Pair
+    | Triple
+    | ConsecutivePairs
+    | Straight
     | Bomb Bomb
-    | Irregular (List Card)
+    | Dog
+    | Irregular
 
 
 type Action
@@ -59,7 +60,7 @@ type Action
     | PickUp Player
     | CallGrandTichu Player
     | CallTichu Player
-    | Play Player Combination
+    | Play Player Combination (List Card)
     | Pass Player
     | TakeTrick Player
     | GiveDragon Player
@@ -295,7 +296,7 @@ act action game =
 
         Playing state ->
             case action of
-                Play player _ ->
+                Play player _ _ ->
                     { game
                         | phase = Playing (Players.set player Idle state)
                         , cards = cardsAfterAction
@@ -374,10 +375,10 @@ cardAction action =
                             card.location
                 )
 
-        Play player combination ->
+        Play player _ cards ->
             Cards.PlayCards
                 player
-                (cardsInCombination combination)
+                cards
                 Cards.Table
 
         EveryonePickUp ->
@@ -436,53 +437,31 @@ type PlayError
     = NotHigher
     | WrongCombination
     | WrongNumberOfCards
-    | Invalid
 
 
-isPlayValid : Combination -> Combination -> Result PlayError ()
-isPlayValid first second =
-    case ( first, second ) of
-        ( Single firstCard, Single secondCard ) ->
-            compareCombinations [ firstCard ] [ secondCard ]
-
-        ( Pair ( firstPair, _ ), Pair ( secondPair, _ ) ) ->
-            compareCombinations [ firstPair ] [ secondPair ]
-
-        ( Triple ( firstTriple, _, _ ), Triple ( secondTriple, _, _ ) ) ->
-            compareCombinations [ firstTriple ] [ secondTriple ]
-
-        ( ConsecutivePairs firstCards, ConsecutivePairs secondCards ) ->
-            compareCombinations firstCards secondCards
-
-        ( Straight firstCards, Straight secondCards ) ->
-            compareCombinations firstCards secondCards
-
-        ( Bomb firstBomb, Bomb secondBomb ) ->
-            case ( firstBomb, secondBomb ) of
-                ( FourOfAKind firstFour, FourOfAKind secondFour ) ->
-                    compareCombinations firstFour secondFour
-
-                ( StraightFlush firstFlush, StraightFlush secondFlush ) ->
-                    if List.length secondFlush > List.length firstFlush then
-                        Ok ()
-
-                    else
-                        compareCombinations firstFlush secondFlush
-
-                ( FourOfAKind _, StraightFlush _ ) ->
-                    Ok ()
-
-                ( StraightFlush _, FourOfAKind _ ) ->
-                    Err NotHigher
-
-        ( _, Bomb _ ) ->
+isPlayValid : ( Combination, List Card ) -> ( Combination, List Card ) -> Result PlayError ()
+isPlayValid ( first, firstCards ) ( second, secondCards ) =
+    if first == Bomb StraightFlush && second == Bomb StraightFlush then
+        if List.length secondCards > List.length firstCards then
             Ok ()
 
-        ( _, Irregular _ ) ->
-            Err Invalid
+        else
+            compareCombinations firstCards secondCards
 
-        _ ->
-            Err WrongCombination
+    else if first == second then
+        compareCombinations firstCards secondCards
+
+    else if first == Bomb FourOfAKind && second == Bomb StraightFlush then
+        Ok ()
+
+    else if second == Bomb StraightFlush then
+        Ok ()
+
+    else if first == Dog then
+        Ok ()
+
+    else
+        Err WrongCombination
 
 
 compareCombinations : List Card -> List Card -> Result PlayError ()
@@ -513,110 +492,96 @@ compareCombinations firstCards secondCards =
                 Err WrongCombination
 
 
-cardsInCombination : Combination -> List Card
-cardsInCombination combination =
-    case combination of
-        Single card ->
-            [ card ]
-
-        Pair ( c1, c2 ) ->
-            [ c1, c2 ]
-
-        Triple ( c1, c2, c3 ) ->
-            [ c1, c2, c3 ]
-
-        ConsecutivePairs cards ->
-            cards
-
-        Straight cards ->
-            cards
-
-        Bomb (FourOfAKind cards) ->
-            cards
-
-        Bomb (StraightFlush cards) ->
-            cards
-
-        Irregular cards ->
-            cards
-
-
-determineCombination : List Card -> Combination
+determineCombination : List Card -> ( Combination, List Card )
 determineCombination cards =
     let
         sortedCards =
             List.sortBy .rank cards
 
-        maybeCombination =
+        ( maybeCombination, cardsInCombination ) =
             case sortedCards of
                 [] ->
-                    Nothing
+                    ( Nothing, cards )
 
                 [ c ] ->
-                    Maybe.map Single (parseSingle c)
+                    parseSingle c
 
                 [ c1, c2 ] ->
-                    Maybe.map Pair (parsePair c1 c2)
+                    parsePair c1 c2
 
                 [ c1, c2, c3 ] ->
-                    Maybe.map Triple (parseTriple c1 c2 c3)
+                    parseTriple c1 c2 c3
 
                 [ c1, c2, c3, c4 ] ->
                     parseQuadruple c1 c2 c3 c4
 
                 c :: cs ->
                     case parseStraight c cs of
-                        Just combination ->
-                            Just combination
+                        ( Just combination, straightCards ) ->
+                            ( Just combination, straightCards )
 
-                        Nothing ->
-                            Maybe.map ConsecutivePairs (parseConsecutive (c :: cs))
+                        ( Nothing, _ ) ->
+                            parseConsecutive (c :: cs)
     in
-    Maybe.withDefault (Irregular cards) maybeCombination
+    ( Maybe.withDefault Irregular maybeCombination, cardsInCombination )
 
 
-parseSingle : Card -> Maybe Card
+parseSingle : Card -> ( Maybe Combination, List Card )
 parseSingle card =
-    if card.id == "dog" then
-        Nothing
+    if card == cardDefinition.dog then
+        ( Just Dog, [ card ] )
 
     else
-        Just card
+        ( Just Single, [ card ] )
 
 
-parsePair : Card -> Card -> Maybe ( Card, Card )
+parsePair : Card -> Card -> ( Maybe Combination, List Card )
 parsePair c1 c2 =
-    if c1.rank == c2.rank then
-        Just ( c1, c2 )
+    if c1 == cardDefinition.dragon || c2 == cardDefinition.dragon then
+        ( Nothing, [ c1, c2 ] )
 
-    else if c1.id == "phoenix" then
-        Just ( c2, c1 )
+    else if c1 == cardDefinition.dog || c2 == cardDefinition.dog then
+        ( Nothing, [ c1, c2 ] )
 
-    else if c2.id == "phoenix" then
-        Just ( c1, c2 )
+    else if c1.rank == c2.rank then
+        ( Just Pair, [ c1, c2 ] )
+
+    else if c1 == cardDefinition.phoenix then
+        ( Just Pair, [ c2, c1 ] )
+
+    else if c2 == cardDefinition.phoenix then
+        ( Just Pair, [ c1, c2 ] )
 
     else
-        Nothing
+        ( Nothing, [ c1, c2 ] )
 
 
-parseTriple : Card -> Card -> Card -> Maybe ( Card, Card, Card )
+parseTriple : Card -> Card -> Card -> ( Maybe Combination, List Card )
 parseTriple c1 c2 c3 =
-    let
-        formTriple =
-            \( one, two ) ( _, three ) ->
-                ( one, two, three )
-    in
-    Maybe.map2 formTriple (parsePair c1 c2) (parsePair c2 c3)
+    if c1.rank == c2.rank && c2.rank == c3.rank then
+        ( Just Triple, [ c1, c2, c3 ] )
+
+    else if c1.rank == c2.rank && c3 == cardDefinition.phoenix then
+        ( Just Triple, [ c1, c2, c3 ] )
+
+    else if c1.rank == c3.rank && c2 == cardDefinition.phoenix then
+        ( Just Triple, [ c1, c3, c2 ] )
+
+    else if c2.rank == c3.rank && c1 == cardDefinition.phoenix then
+        ( Just Triple, [ c2, c3, c1 ] )
+
+    else
+        ( Nothing, [ c1, c2, c3 ] )
 
 
-parseQuadruple : Card -> Card -> Card -> Card -> Maybe Combination
+parseQuadruple : Card -> Card -> Card -> Card -> ( Maybe Combination, List Card )
 parseQuadruple c1 c2 c3 c4 =
     case parseFourCardBomb c1 c2 c3 c4 of
-        Just cards ->
-            Just (Bomb (FourOfAKind cards))
+        Just _ ->
+            ( Just (Bomb FourOfAKind), [ c1, c2, c3, c4 ] )
 
         Nothing ->
-            Maybe.map ConsecutivePairs (parseConsecutive [ c1, c2, c3, c4 ])
+            parseConsecutive [ c1, c2, c3, c4 ]
 
 
 parseFourCardBomb : Card -> Card -> Card -> Card -> Maybe (List Card)
@@ -632,10 +597,10 @@ parseFourCardBomb c1 c2 c3 c4 =
         Nothing
 
 
-parseConsecutive : List Card -> Maybe (List Card)
+parseConsecutive : List Card -> ( Maybe Combination, List Card )
 parseConsecutive cards =
     if modBy 2 (List.length cards) /= 0 then
-        Nothing
+        ( Nothing, cards )
 
     else
         let
@@ -646,7 +611,7 @@ parseConsecutive cards =
                 List.isEmpty (List.filter (\c -> c.id == "dragon" || c.id == "dog") cards)
         in
         if not validCards then
-            Nothing
+            ( Nothing, cards )
 
         else
             case cards of
@@ -660,13 +625,13 @@ parseConsecutive cards =
                             orderedWithPhoenix =
                                 orderWithPhoenix phoenixUsedAt cards
                         in
-                        Just orderedWithPhoenix
+                        ( Just ConsecutivePairs, orderedWithPhoenix )
 
                     else
-                        Nothing
+                        ( Nothing, cards )
 
                 _ ->
-                    Nothing
+                    ( Nothing, cards )
 
 
 testConsecutive : Card -> List Card -> Bool -> Bool -> Int -> ( Bool, Int )
@@ -711,7 +676,7 @@ testConsecutive first rest foundTheOther canUsePhoenix depth =
                 ( False, depth )
 
 
-parseStraight : Card -> List Card -> Maybe Combination
+parseStraight : Card -> List Card -> ( Maybe Combination, List Card )
 parseStraight first rest =
     let
         cards =
@@ -727,7 +692,7 @@ parseStraight first rest =
             List.isEmpty (List.filter (\c -> c.id == "dragon" || c.id == "dog") cards)
     in
     if not validCards then
-        Nothing
+        ( Nothing, cards )
 
     else
         let
@@ -735,17 +700,17 @@ parseStraight first rest =
                 testStraight first rest containsPhoenix 0
         in
         if isStraight && maybeBomb then
-            Just (Bomb (StraightFlush cards))
+            ( Just (Bomb StraightFlush), cards )
 
         else if isStraight then
             let
                 orderedWithPhoenix =
                     orderWithPhoenix phoenixUsedAt cards
             in
-            Just (Straight orderedWithPhoenix)
+            ( Just Straight, orderedWithPhoenix )
 
         else
-            Nothing
+            ( Nothing, cards )
 
 
 testStraight : Card -> List Card -> Bool -> Int -> ( Bool, Int )
@@ -806,396 +771,512 @@ orderWithPhoenix phoenixUsedAt cards =
 
 deck : Cards.Deck Suit
 deck =
-    [ { id = "dragon"
-      , displayName = "Dragon"
-      , fullName = "Dragon"
-      , value = 25
-      , rank = 16
-      , suit = Special
-      }
-    , { id = "dog"
-      , displayName = "Dog"
-      , fullName = "Dog"
-      , value = 0
-      , rank = 0
-      , suit = Special
-      }
-    , { id = "phoenix"
-      , displayName = "Phoenix"
-      , fullName = "Phoenix"
-      , value = -25
-      , rank = 15
-      , suit = Special
-      }
-    , { id = "bird"
-      , displayName = "Bird"
-      , fullName = "Bird"
-      , value = 0
-      , rank = 1
-      , suit = Special
-      }
-    , { id = "green_2"
-      , displayName = "2"
-      , fullName = "Green 2"
-      , value = 0
-      , rank = 2
-      , suit = Green
-      }
-    , { id = "green_3"
-      , displayName = "3"
-      , fullName = "Green 3"
-      , value = 0
-      , rank = 3
-      , suit = Green
-      }
-    , { id = "green_4"
-      , displayName = "4"
-      , fullName = "Green 4"
-      , value = 0
-      , rank = 4
-      , suit = Green
-      }
-    , { id = "green_5"
-      , displayName = "5"
-      , fullName = "Green 5"
-      , value = 5
-      , rank = 5
-      , suit = Green
-      }
-    , { id = "green_6"
-      , displayName = "6"
-      , fullName = "Green 6"
-      , value = 0
-      , rank = 6
-      , suit = Green
-      }
-    , { id = "green_7"
-      , displayName = "7"
-      , fullName = "Green 7"
-      , value = 0
-      , rank = 7
-      , suit = Green
-      }
-    , { id = "green_8"
-      , displayName = "8"
-      , fullName = "Green 8"
-      , value = 0
-      , rank = 8
-      , suit = Green
-      }
-    , { id = "green_9"
-      , displayName = "9"
-      , fullName = "Green 9"
-      , value = 0
-      , rank = 9
-      , suit = Green
-      }
-    , { id = "green_10"
-      , displayName = "10"
-      , fullName = "Green 10"
-      , value = 10
-      , rank = 10
-      , suit = Green
-      }
-    , { id = "green_J"
-      , displayName = "J"
-      , fullName = "Green Jack"
-      , value = 0
-      , rank = 11
-      , suit = Green
-      }
-    , { id = "green_Q"
-      , displayName = "Q"
-      , fullName = "Green Queen"
-      , value = 0
-      , rank = 12
-      , suit = Green
-      }
-    , { id = "green_K"
-      , displayName = "K"
-      , fullName = "Green King"
-      , value = 10
-      , rank = 13
-      , suit = Green
-      }
-    , { id = "green_A"
-      , displayName = "A"
-      , fullName = "Green Ace"
-      , value = 0
-      , rank = 14
-      , suit = Green
-      }
-    , { id = "black_2"
-      , displayName = "2"
-      , fullName = "Black 2"
-      , value = 0
-      , rank = 2
-      , suit = Black
-      }
-    , { id = "black_3"
-      , displayName = "3"
-      , fullName = "Black 3"
-      , value = 0
-      , rank = 3
-      , suit = Black
-      }
-    , { id = "black_4"
-      , displayName = "4"
-      , fullName = "Black 4"
-      , value = 0
-      , rank = 4
-      , suit = Black
-      }
-    , { id = "black_5"
-      , displayName = "5"
-      , fullName = "Black 5"
-      , value = 5
-      , rank = 5
-      , suit = Black
-      }
-    , { id = "black_6"
-      , displayName = "6"
-      , fullName = "Black 6"
-      , value = 0
-      , rank = 6
-      , suit = Black
-      }
-    , { id = "black_7"
-      , displayName = "7"
-      , fullName = "Black 7"
-      , value = 0
-      , rank = 7
-      , suit = Black
-      }
-    , { id = "black_8"
-      , displayName = "8"
-      , fullName = "Black 8"
-      , value = 0
-      , rank = 8
-      , suit = Black
-      }
-    , { id = "black_9"
-      , displayName = "9"
-      , fullName = "Black 9"
-      , value = 0
-      , rank = 9
-      , suit = Black
-      }
-    , { id = "black_10"
-      , displayName = "10"
-      , fullName = "Black 10"
-      , value = 10
-      , rank = 10
-      , suit = Black
-      }
-    , { id = "black_J"
-      , displayName = "J"
-      , fullName = "Black Jack"
-      , value = 0
-      , rank = 11
-      , suit = Black
-      }
-    , { id = "black_Q"
-      , displayName = "Q"
-      , fullName = "Black Queen"
-      , value = 0
-      , rank = 12
-      , suit = Black
-      }
-    , { id = "black_K"
-      , displayName = "K"
-      , fullName = "Black King"
-      , value = 10
-      , rank = 13
-      , suit = Black
-      }
-    , { id = "black_A"
-      , displayName = "A"
-      , fullName = "Black Ace"
-      , value = 0
-      , rank = 14
-      , suit = Black
-      }
-    , { id = "blue_2"
-      , displayName = "2"
-      , fullName = "Blue 2"
-      , value = 0
-      , rank = 2
-      , suit = Blue
-      }
-    , { id = "blue_3"
-      , displayName = "3"
-      , fullName = "Blue 3"
-      , value = 0
-      , rank = 3
-      , suit = Blue
-      }
-    , { id = "blue_4"
-      , displayName = "4"
-      , fullName = "Blue 4"
-      , value = 0
-      , rank = 4
-      , suit = Blue
-      }
-    , { id = "blue_5"
-      , displayName = "5"
-      , fullName = "Blue 5"
-      , value = 5
-      , rank = 5
-      , suit = Blue
-      }
-    , { id = "blue_6"
-      , displayName = "6"
-      , fullName = "Blue 6"
-      , value = 0
-      , rank = 6
-      , suit = Blue
-      }
-    , { id = "blue_7"
-      , displayName = "7"
-      , fullName = "Blue 7"
-      , value = 0
-      , rank = 7
-      , suit = Blue
-      }
-    , { id = "blue_8"
-      , displayName = "8"
-      , fullName = "Blue 8"
-      , value = 0
-      , rank = 8
-      , suit = Blue
-      }
-    , { id = "blue_9"
-      , displayName = "9"
-      , fullName = "Blue 9"
-      , value = 0
-      , rank = 9
-      , suit = Blue
-      }
-    , { id = "blue_10"
-      , displayName = "10"
-      , fullName = "Blue 10"
-      , value = 10
-      , rank = 10
-      , suit = Blue
-      }
-    , { id = "blue_J"
-      , displayName = "J"
-      , fullName = "Blue Jack"
-      , value = 0
-      , rank = 11
-      , suit = Blue
-      }
-    , { id = "blue_Q"
-      , displayName = "Q"
-      , fullName = "Blue Queen"
-      , value = 0
-      , rank = 12
-      , suit = Blue
-      }
-    , { id = "blue_K"
-      , displayName = "K"
-      , fullName = "Blue King"
-      , value = 10
-      , rank = 13
-      , suit = Blue
-      }
-    , { id = "blue_A"
-      , displayName = "A"
-      , fullName = "Blue Ace"
-      , value = 0
-      , rank = 14
-      , suit = Blue
-      }
-    , { id = "red_2"
-      , displayName = "2"
-      , fullName = "Red 2"
-      , value = 0
-      , rank = 2
-      , suit = Red
-      }
-    , { id = "red_3"
-      , displayName = "3"
-      , fullName = "Red 3"
-      , value = 0
-      , rank = 3
-      , suit = Red
-      }
-    , { id = "red_4"
-      , displayName = "4"
-      , fullName = "Red 4"
-      , value = 0
-      , rank = 4
-      , suit = Red
-      }
-    , { id = "red_5"
-      , displayName = "5"
-      , fullName = "Red 5"
-      , value = 5
-      , rank = 5
-      , suit = Red
-      }
-    , { id = "red_6"
-      , displayName = "6"
-      , fullName = "Red 6"
-      , value = 0
-      , rank = 6
-      , suit = Red
-      }
-    , { id = "red_7"
-      , displayName = "7"
-      , fullName = "Red 7"
-      , value = 0
-      , rank = 7
-      , suit = Red
-      }
-    , { id = "red_8"
-      , displayName = "8"
-      , fullName = "Red 8"
-      , value = 0
-      , rank = 8
-      , suit = Red
-      }
-    , { id = "red_9"
-      , displayName = "9"
-      , fullName = "Red 9"
-      , value = 0
-      , rank = 9
-      , suit = Red
-      }
-    , { id = "red_10"
-      , displayName = "10"
-      , fullName = "Red 10"
-      , value = 10
-      , rank = 10
-      , suit = Red
-      }
-    , { id = "red_J"
-      , displayName = "J"
-      , fullName = "Red Jack"
-      , value = 0
-      , rank = 11
-      , suit = Red
-      }
-    , { id = "red_Q"
-      , displayName = "Q"
-      , fullName = "Red Queen"
-      , value = 0
-      , rank = 12
-      , suit = Red
-      }
-    , { id = "red_K"
-      , displayName = "K"
-      , fullName = "Red King"
-      , value = 10
-      , rank = 13
-      , suit = Red
-      }
-    , { id = "red_A"
-      , displayName = "A"
-      , fullName = "Red Ace"
-      , value = 0
-      , rank = 14
-      , suit = Red
-      }
+    [ cardDefinition.dragon
+    , cardDefinition.dog
+    , cardDefinition.phoenix
+    , cardDefinition.bird
+    , cardDefinition.green_2
+    , cardDefinition.green_3
+    , cardDefinition.green_4
+    , cardDefinition.green_5
+    , cardDefinition.green_6
+    , cardDefinition.green_7
+    , cardDefinition.green_8
+    , cardDefinition.green_9
+    , cardDefinition.green_10
+    , cardDefinition.green_J
+    , cardDefinition.green_Q
+    , cardDefinition.green_K
+    , cardDefinition.green_A
+    , cardDefinition.black_2
+    , cardDefinition.black_3
+    , cardDefinition.black_4
+    , cardDefinition.black_5
+    , cardDefinition.black_6
+    , cardDefinition.black_7
+    , cardDefinition.black_8
+    , cardDefinition.black_9
+    , cardDefinition.black_10
+    , cardDefinition.black_J
+    , cardDefinition.black_Q
+    , cardDefinition.black_K
+    , cardDefinition.black_A
+    , cardDefinition.blue_2
+    , cardDefinition.blue_3
+    , cardDefinition.blue_4
+    , cardDefinition.blue_5
+    , cardDefinition.blue_6
+    , cardDefinition.blue_7
+    , cardDefinition.blue_8
+    , cardDefinition.blue_9
+    , cardDefinition.blue_10
+    , cardDefinition.blue_J
+    , cardDefinition.blue_Q
+    , cardDefinition.blue_K
+    , cardDefinition.blue_A
+    , cardDefinition.red_2
+    , cardDefinition.red_3
+    , cardDefinition.red_4
+    , cardDefinition.red_5
+    , cardDefinition.red_6
+    , cardDefinition.red_7
+    , cardDefinition.red_8
+    , cardDefinition.red_9
+    , cardDefinition.red_10
+    , cardDefinition.red_J
+    , cardDefinition.red_Q
+    , cardDefinition.red_K
+    , cardDefinition.red_A
     ]
+
+
+cardDefinition =
+    { dragon =
+        { id = "dragon"
+        , displayName = "Dragon"
+        , fullName = "Dragon"
+        , value = 25
+        , rank = 16
+        , suit = Special
+        }
+    , dog =
+        { id = "dog"
+        , displayName = "Dog"
+        , fullName = "Dog"
+        , value = 0
+        , rank = 0
+        , suit = Special
+        }
+    , phoenix =
+        { id = "phoenix"
+        , displayName = "Phoenix"
+        , fullName = "Phoenix"
+        , value = -25
+        , rank = 15
+        , suit = Special
+        }
+    , bird =
+        { id = "bird"
+        , displayName = "Bird"
+        , fullName = "Bird"
+        , value = 0
+        , rank = 1
+        , suit = Special
+        }
+    , green_2 =
+        { id = "green_2"
+        , displayName = "2"
+        , fullName = "Green 2"
+        , value = 0
+        , rank = 2
+        , suit = Green
+        }
+    , green_3 =
+        { id = "green_3"
+        , displayName = "3"
+        , fullName = "Green 3"
+        , value = 0
+        , rank = 3
+        , suit = Green
+        }
+    , green_4 =
+        { id = "green_4"
+        , displayName = "4"
+        , fullName = "Green 4"
+        , value = 0
+        , rank = 4
+        , suit = Green
+        }
+    , green_5 =
+        { id = "green_5"
+        , displayName = "5"
+        , fullName = "Green 5"
+        , value = 5
+        , rank = 5
+        , suit = Green
+        }
+    , green_6 =
+        { id = "green_6"
+        , displayName = "6"
+        , fullName = "Green 6"
+        , value = 0
+        , rank = 6
+        , suit = Green
+        }
+    , green_7 =
+        { id = "green_7"
+        , displayName = "7"
+        , fullName = "Green 7"
+        , value = 0
+        , rank = 7
+        , suit = Green
+        }
+    , green_8 =
+        { id = "green_8"
+        , displayName = "8"
+        , fullName = "Green 8"
+        , value = 0
+        , rank = 8
+        , suit = Green
+        }
+    , green_9 =
+        { id = "green_9"
+        , displayName = "9"
+        , fullName = "Green 9"
+        , value = 0
+        , rank = 9
+        , suit = Green
+        }
+    , green_10 =
+        { id = "green_10"
+        , displayName = "10"
+        , fullName = "Green 10"
+        , value = 10
+        , rank = 10
+        , suit = Green
+        }
+    , green_J =
+        { id = "green_J"
+        , displayName = "J"
+        , fullName = "Green Jack"
+        , value = 0
+        , rank = 11
+        , suit = Green
+        }
+    , green_Q =
+        { id = "green_Q"
+        , displayName = "Q"
+        , fullName = "Green Queen"
+        , value = 0
+        , rank = 12
+        , suit = Green
+        }
+    , green_K =
+        { id = "green_K"
+        , displayName = "K"
+        , fullName = "Green King"
+        , value = 10
+        , rank = 13
+        , suit = Green
+        }
+    , green_A =
+        { id = "green_A"
+        , displayName = "A"
+        , fullName = "Green Ace"
+        , value = 0
+        , rank = 14
+        , suit = Green
+        }
+    , black_2 =
+        { id = "black_2"
+        , displayName = "2"
+        , fullName = "Black 2"
+        , value = 0
+        , rank = 2
+        , suit = Black
+        }
+    , black_3 =
+        { id = "black_3"
+        , displayName = "3"
+        , fullName = "Black 3"
+        , value = 0
+        , rank = 3
+        , suit = Black
+        }
+    , black_4 =
+        { id = "black_4"
+        , displayName = "4"
+        , fullName = "Black 4"
+        , value = 0
+        , rank = 4
+        , suit = Black
+        }
+    , black_5 =
+        { id = "black_5"
+        , displayName = "5"
+        , fullName = "Black 5"
+        , value = 5
+        , rank = 5
+        , suit = Black
+        }
+    , black_6 =
+        { id = "black_6"
+        , displayName = "6"
+        , fullName = "Black 6"
+        , value = 0
+        , rank = 6
+        , suit = Black
+        }
+    , black_7 =
+        { id = "black_7"
+        , displayName = "7"
+        , fullName = "Black 7"
+        , value = 0
+        , rank = 7
+        , suit = Black
+        }
+    , black_8 =
+        { id = "black_8"
+        , displayName = "8"
+        , fullName = "Black 8"
+        , value = 0
+        , rank = 8
+        , suit = Black
+        }
+    , black_9 =
+        { id = "black_9"
+        , displayName = "9"
+        , fullName = "Black 9"
+        , value = 0
+        , rank = 9
+        , suit = Black
+        }
+    , black_10 =
+        { id = "black_10"
+        , displayName = "10"
+        , fullName = "Black 10"
+        , value = 10
+        , rank = 10
+        , suit = Black
+        }
+    , black_J =
+        { id = "black_J"
+        , displayName = "J"
+        , fullName = "Black Jack"
+        , value = 0
+        , rank = 11
+        , suit = Black
+        }
+    , black_Q =
+        { id = "black_Q"
+        , displayName = "Q"
+        , fullName = "Black Queen"
+        , value = 0
+        , rank = 12
+        , suit = Black
+        }
+    , black_K =
+        { id = "black_K"
+        , displayName = "K"
+        , fullName = "Black King"
+        , value = 10
+        , rank = 13
+        , suit = Black
+        }
+    , black_A =
+        { id = "black_A"
+        , displayName = "A"
+        , fullName = "Black Ace"
+        , value = 0
+        , rank = 14
+        , suit = Black
+        }
+    , blue_2 =
+        { id = "blue_2"
+        , displayName = "2"
+        , fullName = "Blue 2"
+        , value = 0
+        , rank = 2
+        , suit = Blue
+        }
+    , blue_3 =
+        { id = "blue_3"
+        , displayName = "3"
+        , fullName = "Blue 3"
+        , value = 0
+        , rank = 3
+        , suit = Blue
+        }
+    , blue_4 =
+        { id = "blue_4"
+        , displayName = "4"
+        , fullName = "Blue 4"
+        , value = 0
+        , rank = 4
+        , suit = Blue
+        }
+    , blue_5 =
+        { id = "blue_5"
+        , displayName = "5"
+        , fullName = "Blue 5"
+        , value = 5
+        , rank = 5
+        , suit = Blue
+        }
+    , blue_6 =
+        { id = "blue_6"
+        , displayName = "6"
+        , fullName = "Blue 6"
+        , value = 0
+        , rank = 6
+        , suit = Blue
+        }
+    , blue_7 =
+        { id = "blue_7"
+        , displayName = "7"
+        , fullName = "Blue 7"
+        , value = 0
+        , rank = 7
+        , suit = Blue
+        }
+    , blue_8 =
+        { id = "blue_8"
+        , displayName = "8"
+        , fullName = "Blue 8"
+        , value = 0
+        , rank = 8
+        , suit = Blue
+        }
+    , blue_9 =
+        { id = "blue_9"
+        , displayName = "9"
+        , fullName = "Blue 9"
+        , value = 0
+        , rank = 9
+        , suit = Blue
+        }
+    , blue_10 =
+        { id = "blue_10"
+        , displayName = "10"
+        , fullName = "Blue 10"
+        , value = 10
+        , rank = 10
+        , suit = Blue
+        }
+    , blue_J =
+        { id = "blue_J"
+        , displayName = "J"
+        , fullName = "Blue Jack"
+        , value = 0
+        , rank = 11
+        , suit = Blue
+        }
+    , blue_Q =
+        { id = "blue_Q"
+        , displayName = "Q"
+        , fullName = "Blue Queen"
+        , value = 0
+        , rank = 12
+        , suit = Blue
+        }
+    , blue_K =
+        { id = "blue_K"
+        , displayName = "K"
+        , fullName = "Blue King"
+        , value = 10
+        , rank = 13
+        , suit = Blue
+        }
+    , blue_A =
+        { id = "blue_A"
+        , displayName = "A"
+        , fullName = "Blue Ace"
+        , value = 0
+        , rank = 14
+        , suit = Blue
+        }
+    , red_2 =
+        { id = "red_2"
+        , displayName = "2"
+        , fullName = "Red 2"
+        , value = 0
+        , rank = 2
+        , suit = Red
+        }
+    , red_3 =
+        { id = "red_3"
+        , displayName = "3"
+        , fullName = "Red 3"
+        , value = 0
+        , rank = 3
+        , suit = Red
+        }
+    , red_4 =
+        { id = "red_4"
+        , displayName = "4"
+        , fullName = "Red 4"
+        , value = 0
+        , rank = 4
+        , suit = Red
+        }
+    , red_5 =
+        { id = "red_5"
+        , displayName = "5"
+        , fullName = "Red 5"
+        , value = 5
+        , rank = 5
+        , suit = Red
+        }
+    , red_6 =
+        { id = "red_6"
+        , displayName = "6"
+        , fullName = "Red 6"
+        , value = 0
+        , rank = 6
+        , suit = Red
+        }
+    , red_7 =
+        { id = "red_7"
+        , displayName = "7"
+        , fullName = "Red 7"
+        , value = 0
+        , rank = 7
+        , suit = Red
+        }
+    , red_8 =
+        { id = "red_8"
+        , displayName = "8"
+        , fullName = "Red 8"
+        , value = 0
+        , rank = 8
+        , suit = Red
+        }
+    , red_9 =
+        { id = "red_9"
+        , displayName = "9"
+        , fullName = "Red 9"
+        , value = 0
+        , rank = 9
+        , suit = Red
+        }
+    , red_10 =
+        { id = "red_10"
+        , displayName = "10"
+        , fullName = "Red 10"
+        , value = 10
+        , rank = 10
+        , suit = Red
+        }
+    , red_J =
+        { id = "red_J"
+        , displayName = "J"
+        , fullName = "Red Jack"
+        , value = 0
+        , rank = 11
+        , suit = Red
+        }
+    , red_Q =
+        { id = "red_Q"
+        , displayName = "Q"
+        , fullName = "Red Queen"
+        , value = 0
+        , rank = 12
+        , suit = Red
+        }
+    , red_K =
+        { id = "red_K"
+        , displayName = "K"
+        , fullName = "Red King"
+        , value = 10
+        , rank = 13
+        , suit = Red
+        }
+    , red_A =
+        { id = "red_A"
+        , displayName = "A"
+        , fullName = "Red Ace"
+        , value = 0
+        , rank = 14
+        , suit = Red
+        }
+    }
