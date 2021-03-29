@@ -46,6 +46,7 @@ type Combination
     = Single
     | Pair
     | Triple
+    | FullHouse
     | ConsecutivePairs
     | Straight
     | Bomb Bomb
@@ -515,6 +516,14 @@ determineCombination cards =
                 [ c1, c2, c3, c4 ] ->
                     parseQuadruple c1 c2 c3 c4
 
+                [ c1, c2, c3, c4, c5 ] ->
+                    case parseStraight c1 [ c2, c3, c4, c5 ] of
+                        ( Just combination, straightCards ) ->
+                            ( Just combination, straightCards )
+
+                        ( Nothing, _ ) ->
+                            parseFullHouse c1 c2 c3 c4 c5
+
                 c :: cs ->
                     case parseStraight c cs of
                         ( Just combination, straightCards ) ->
@@ -572,6 +581,30 @@ parseTriple c1 c2 c3 =
 
     else
         ( Nothing, [ c1, c2, c3 ] )
+
+
+parseFullHouse : Card -> Card -> Card -> Card -> Card -> ( Maybe Combination, List Card )
+parseFullHouse c1 c2 c3 c4 c5 =
+    case parseFourCardBomb c1 c2 c3 c4 of
+        Just _ ->
+            ( Nothing, [ c1, c2, c3, c4, c5 ] )
+
+        _ ->
+            Maybe.withDefault ( Nothing, [ c1, c2, c3, c4, c5 ] ) (checkFullHouse c1 c2 c3 c4 c5 3)
+
+
+checkFullHouse : Card -> Card -> Card -> Card -> Card -> Int -> Maybe ( Maybe Combination, List Card )
+checkFullHouse c1 c2 c3 c4 c5 count =
+    if count == 0 then
+        Nothing
+
+    else
+        case ( parseTriple c1 c2 c3, parsePair c4 c5 ) of
+            ( ( Just _, triple ), ( Just _, pair ) ) ->
+                Just ( Just FullHouse, triple ++ pair )
+
+            _ ->
+                checkFullHouse c2 c3 c4 c5 c1 (count - 1)
 
 
 parseQuadruple : Card -> Card -> Card -> Card -> ( Maybe Combination, List Card )

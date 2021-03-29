@@ -172,7 +172,7 @@ viewGame model =
         [ viewGameHeader model
         , case model.game of
             Dealt game ->
-                viewTable model game (Just East)
+                viewTable model game (Just West)
 
             Undealt ->
                 H.text ""
@@ -510,6 +510,9 @@ viewPlayer model info =
 
                                 Tichu.Triple ->
                                     "Triple"
+
+                                Tichu.FullHouse ->
+                                    "Full House"
 
                                 Tichu.ConsecutivePairs ->
                                     "Consecutive Pairs"

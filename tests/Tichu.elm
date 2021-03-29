@@ -344,6 +344,75 @@ combinations =
                             ]
                 ]
             ]
+        , describe "Full houses"
+            [ describe "Normal full houses"
+                [ test "Triple high" <|
+                    \_ ->
+                        expect FullHouse
+                            [ .green_8
+                            , .red_8
+                            , .blue_8
+                            , .red_3
+                            , .black_3
+                            ]
+                , test "Pair high" <|
+                    \_ ->
+                        expect FullHouse
+                            [ .blue_2
+                            , .black_2
+                            , .red_2
+                            , .green_A
+                            , .red_A
+                            ]
+                ]
+            , describe "Full houses with phoenix"
+                [ test "Phoenix attaches to higher pair" <|
+                    \_ ->
+                        expect FullHouse
+                            [ .red_8
+                            , .blue_8
+                            , .phoenix
+                            , .green_2
+                            , .black_2
+                            ]
+                , test "Phoenix can fill in higher single" <|
+                    \_ ->
+                        expect FullHouse
+                            [ .red_8
+                            , .blue_8
+                            , .black_8
+                            , .green_K
+                            , .phoenix
+                            ]
+                , test "Phoenix can fill in lower single" <|
+                    \_ ->
+                        expect FullHouse
+                            [ .red_8
+                            , .blue_8
+                            , .black_8
+                            , .green_2
+                            , .phoenix
+                            ]
+                , test "Phoenix can't be used with a four of a kind bomb" <|
+                    \_ ->
+                        expect Irregular
+                            [ .red_8
+                            , .blue_8
+                            , .black_8
+                            , .green_8
+                            , .phoenix
+                            ]
+                , test "Phoenix can be used with the bird" <|
+                    \_ ->
+                        expect FullHouse
+                            [ .red_8
+                            , .blue_8
+                            , .black_8
+                            , .bird
+                            , .phoenix
+                            ]
+                ]
+            ]
         , describe "Straights"
             [ describe "Normal straights"
                 [ test "Five card straight" <|
