@@ -1,6 +1,7 @@
 module Page.Game exposing (Model, Msg, init, update, view)
 
 import Css exposing (pct, px, rem)
+import Css.Global
 import Css.Transitions
 import Design
 import Game.Cards as Cards
@@ -172,7 +173,7 @@ viewGame model =
         [ viewGameHeader model
         , case model.game of
             Dealt game ->
-                viewTable model game (Just West)
+                viewTable model game (Just South)
 
             Undealt ->
                 H.text ""
@@ -293,6 +294,7 @@ viewTable model game currentPlayer =
         , H.div
             [ css
                 [ Css.property "grid-area" "table"
+                , Css.padding Design.spacing.small
                 ]
             ]
             [ case currentPlayer of
@@ -325,16 +327,16 @@ viewTable model game currentPlayer =
                                 Tichu.PreGame _ ->
                                     H.text ""
 
-                                Tichu.Playing playingState ->
-                                    viewCardsInPlay game playingState
+                                Tichu.Playing _ ->
+                                    viewCardsInPlay model game
 
                 Nothing ->
                     case game.phase of
                         Tichu.PreGame _ ->
                             H.text ""
 
-                        Tichu.Playing playingState ->
-                            viewCardsInPlay game playingState
+                        Tichu.Playing _ ->
+                            viewCardsInPlay model game
             ]
         , H.div
             [ css
@@ -350,34 +352,119 @@ viewTable model game currentPlayer =
         ]
 
 
-viewCardsInPlay : Tichu.Game -> Players Tichu.PlayingState -> Html Msg
-viewCardsInPlay game players =
+viewCardsInPlay : Model -> Tichu.Game -> Html Msg
+viewCardsInPlay model game =
     let
         cardsOnTable =
             Cards.byPlay Cards.Table game.cards
+
+        combinations =
+            List.map
+                (\( player, cardsInPlay ) ->
+                    let
+                        ( combination, cards ) =
+                            Tichu.determineCombination cardsInPlay
+                    in
+                    ( player, combination, cards )
+                )
+                cardsOnTable
+
+        firstCombination =
+            case combinations of
+                [] ->
+                    Nothing
+
+                ( _, Tichu.Dog, _ ) :: cs ->
+                    case cs of
+                        [] ->
+                            Nothing
+
+                        ( _, combination, cards ) :: _ ->
+                            Just ( combination, cards )
+
+                ( _, combination, cards ) :: _ ->
+                    Just ( combination, cards )
     in
+    H.section
+        []
+        [ H.header
+            [ css
+                [ Css.marginBottom Design.spacing.small
+                ]
+            ]
+            [ viewCurrentPlay model game firstCombination
+            ]
+        , H.ol
+            [ css
+                [ Css.displayFlex
+                , Css.flexWrap Css.wrap
+                ]
+            ]
+          <|
+            List.map
+                (\( player, combination, cards ) ->
+                    H.li
+                        [ css
+                            [ Css.marginRight Design.spacing.large
+                            , Css.marginBottom Design.spacing.large
+                            ]
+                        ]
+                        [ viewCombination ( combination, cards ) (Players.get player model.currentPlayers) ]
+                )
+                combinations
+        ]
+
+
+viewCurrentPlay : Model -> Tichu.Game -> Maybe ( Tichu.Combination, List (Cards.Card Tichu.Suit) ) -> Html Msg
+viewCurrentPlay model game combination =
     H.div
         []
-        (List.map
-            (\( player, cardsInPlay ) ->
-                let
-                    ( combination, cards ) =
-                        Tichu.determineCombination cardsInPlay
-                in
-                H.ol
-                    [ css sharedStyle.cardList ]
-                    (List.map
-                        (\card ->
-                            H.li
-                                [ css sharedStyle.cardListItem ]
-                                [ viewCard card
-                                ]
-                        )
-                        cards
-                    )
-            )
-            cardsOnTable
-        )
+        [ case combination of
+            Just c ->
+                H.h2
+                    [ css
+                        [ Css.fontSize Design.font.large
+                        , Css.textAlign Css.center
+                        ]
+                    ]
+                    [ H.text (Tichu.describeCombination c) ]
+
+            _ ->
+                H.text ""
+        ]
+
+
+viewCombination : ( Tichu.Combination, List (Cards.Card Tichu.Suit) ) -> GamePlayer -> Html Msg
+viewCombination ( combination, cards ) player =
+    H.article
+        [ css
+            [ Css.property "display" "grid"
+            , Css.property "grid-template-columns" "max-content auto"
+            , Css.property "grid-column-gap" Design.spacing.small.value
+            , Css.maxWidth Css.maxContent
+            , sharedStyle.player player.player
+            , Css.property "background-color" Design.color.lightTable.value
+            , Css.borderRadius Design.borderRadius.outer
+            , Css.padding Design.spacing.small
+            , Design.shadow.lowest
+            ]
+        ]
+        [ H.header
+            [ css
+                [ Css.color Design.color.white
+                ]
+            ]
+            [ viewPlayerTag player
+            ]
+        , H.ol [ css (sharedStyle.cardList ++ sharedStyle.cardListCollapsed) ] <|
+            List.map
+                (\card ->
+                    H.li
+                        [ css sharedStyle.cardListItem ]
+                        [ viewCard card ]
+                )
+                cards
+        ]
 
 
 viewPlayerInfo : Model -> Tichu.PlayerInfo -> Maybe Tichu.PlayerInfo -> Float -> Html Msg
@@ -388,7 +475,6 @@ viewPlayerInfo model info currentPlayer rotation =
             , Css.property "grid-auto-flow" "column"
             , Css.property "column-gap" Design.spacing.medium.value
             , Css.alignItems Css.center
-            , sharedStyle.player info.table.self
             , Css.padding Design.spacing.small
             , Css.borderRadius Design.borderRadius.outer
             , Css.backgroundColor Design.color.lightTable
@@ -407,7 +493,7 @@ viewPlayerInfo model info currentPlayer rotation =
             ]
             [ svgWithText Svg.hand (String.fromInt (List.length info.hand)) ]
         , case info.cards of
-            Tichu.PreGame state ->
+            Tichu.PreGame _ ->
                 H.text ""
 
             Tichu.Playing state ->
@@ -458,6 +544,7 @@ viewPlayerTag player =
             , Css.color Design.color.white
             , Css.lineHeight (Css.int 1)
             , Css.fontSize Design.font.large
+            , sharedStyle.player player.player
             ]
         ]
         [ H.text player.name ]
@@ -496,40 +583,6 @@ viewPlayer model info =
 
                         ( combination, cardsInCombination ) =
                             Tichu.determineCombination selectedCards
-
-                        combinationText =
-                            case combination of
-                                Tichu.Dog ->
-                                    "Dog"
-
-                                Tichu.Single ->
-                                    "Single"
-
-                                Tichu.Pair ->
-                                    "Pair"
-
-                                Tichu.Triple ->
-                                    "Triple"
-
-                                Tichu.FullHouse ->
-                                    "Full House"
-
-                                Tichu.ConsecutivePairs ->
-                                    "Consecutive Pairs"
-
-                                Tichu.Straight ->
-                                    "Straight"
-
-                                Tichu.Bomb bomb ->
-                                    case bomb of
-                                        Tichu.FourOfAKind ->
-                                            "Four of a Kind Bomb"
-
-                                        Tichu.StraightFlush ->
-                                            "Straight Flush Bomb"
-
-                                Tichu.Irregular ->
-                                    "Unknown"
                     in
                     if not (Set.isEmpty selectedCardIds) then
                         H.div
@@ -540,7 +593,7 @@ viewPlayer model info =
                                 ]
                             ]
                             [ Design.button.primary
-                                ("Play " ++ combinationText)
+                                ("Play " ++ Tichu.describeCombination ( combination, cardsInCombination ))
                                 (Action (Tichu.Play info.table.self combination cardsInCombination))
                                 []
                             ]
@@ -935,6 +988,15 @@ sharedStyle =
         , Css.paddingLeft (px pxOverlap)
         , Css.paddingTop (px 75)
         , Css.minHeight (px 150)
+        ]
+    , cardListCollapsed =
+        [ Css.Global.children
+            [ Css.Global.li
+                [ Css.marginLeft (px -70)
+                , Css.firstChild
+                    [ Css.marginLeft (px -pxOverlap) ]
+                ]
+            ]
         ]
     , cardListItem =
         [ Css.marginLeft (px -pxOverlap)

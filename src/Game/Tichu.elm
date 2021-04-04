@@ -14,6 +14,7 @@ module Game.Tichu exposing
     , act
     , cardDefinition
     , deckDefinition
+    , describeCombination
     , determineCombination
     , getPlayersInfo
     , isPlayValid
@@ -800,6 +801,40 @@ orderWithPhoenix phoenixUsedAt cards =
                     cards
     in
     orderedWithPhoenix
+
+
+describeCombination : ( Combination, List Card ) -> String
+describeCombination ( combination, cards ) =
+    case combination of
+        Single ->
+            "Single"
+
+        Pair ->
+            "Pair"
+
+        Triple ->
+            "Triple"
+
+        FullHouse ->
+            "Full House"
+
+        ConsecutivePairs ->
+            String.fromInt (List.length cards // 2) ++ " Consecutive Pairs"
+
+        Straight ->
+            String.fromInt (List.length cards) ++ "-Card Straight"
+
+        Bomb StraightFlush ->
+            String.fromInt (List.length cards) ++ "-Card Straight Flush Bomb"
+
+        Bomb FourOfAKind ->
+            "Bomb"
+
+        Dog ->
+            "The Dog"
+
+        Irregular ->
+            "Unknown"
 
 
 deck : Cards.Deck Suit
