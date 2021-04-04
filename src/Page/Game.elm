@@ -39,8 +39,10 @@ type alias Model =
     { gameId : String
     , deck : Cards.PlayableDeck Tichu.Suit
     , game : Game Tichu.Suit
+    , activePlayer : Maybe Player
     , currentPlayers : Players GamePlayer
     , selectedCards : Players (Set String)
+    , states : List (Game Tichu.Suit)
     }
 
 
@@ -59,8 +61,10 @@ init gameId =
     ( { gameId = gameId
       , deck = Cards.buildDeck Tichu.deckDefinition
       , game = Undealt
+      , activePlayer = Just North
       , currentPlayers = currentPlayers
       , selectedCards = Players.all Set.empty
+      , states = []
       }
     , Cmd.none
     )
@@ -76,6 +80,8 @@ type Msg
     | DeckShuffled (Cards.Deck Tichu.Suit)
     | Action Tichu.Action
     | ToggleCard Player String Bool
+    | Rewind
+    | ChangeActivePlayer String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -101,25 +107,28 @@ update msg model =
                     ( model, Cmd.none )
 
                 Dealt game ->
-                    case action of
-                        Tichu.MarkForPass player card _ ->
-                            ( { model
-                                | game = Dealt (Tichu.act action game)
-                                , selectedCards = Players.set player (Set.remove card.id (Players.get player model.selectedCards)) model.selectedCards
-                              }
-                            , Cmd.none
-                            )
+                    let
+                        newGame =
+                            Dealt (Tichu.act action game)
 
-                        Tichu.Play player _ _ ->
-                            ( { model
-                                | game = Dealt (Tichu.act action game)
-                                , selectedCards = Players.set player Set.empty model.selectedCards
-                              }
-                            , Cmd.none
-                            )
+                        newSelected =
+                            case action of
+                                Tichu.MarkForPass player card _ ->
+                                    Players.set player (Set.remove card.id (Players.get player model.selectedCards)) model.selectedCards
 
-                        _ ->
-                            ( { model | game = Dealt (Tichu.act action game) }, Cmd.none )
+                                Tichu.Play player _ _ ->
+                                    Players.set player Set.empty model.selectedCards
+
+                                _ ->
+                                    model.selectedCards
+                    in
+                    ( { model
+                        | game = newGame
+                        , selectedCards = newSelected
+                        , states = Dealt game :: model.states
+                      }
+                    , Cmd.none
+                    )
 
         ToggleCard player id checked ->
             ( { model
@@ -132,6 +141,41 @@ update msg model =
                             Set.remove id (Players.get player model.selectedCards)
                         )
                         model.selectedCards
+              }
+            , Cmd.none
+            )
+
+        Rewind ->
+            case model.states of
+                [] ->
+                    ( model, Cmd.none )
+
+                state :: rest ->
+                    ( { model
+                        | game = state
+                        , states = rest
+                      }
+                    , Cmd.none
+                    )
+
+        ChangeActivePlayer player ->
+            ( { model
+                | activePlayer =
+                    case player of
+                        "Lyle" ->
+                            Just North
+
+                        "Lydia" ->
+                            Just South
+
+                        "Justin" ->
+                            Just East
+
+                        "Nick" ->
+                            Just West
+
+                        _ ->
+                            Nothing
               }
             , Cmd.none
             )
@@ -173,7 +217,7 @@ viewGame model =
         [ viewGameHeader model
         , case model.game of
             Dealt game ->
-                viewTable model game (Just South)
+                viewTable model game
 
             Undealt ->
                 H.text ""
@@ -185,9 +229,11 @@ viewGameHeader model =
     H.header
         [ css
             [ Css.margin Design.spacing.medium
-            , Css.displayFlex
+            , Css.property "display" "grid"
+            , Css.property "grid-template-columns" "1fr auto"
+            , Css.property "grid-auto-flow" "column"
+            , Css.property "column-gap" Design.spacing.xsmall.value
             , Css.alignItems Css.center
-            , Css.justifyContent Css.spaceBetween
             ]
         ]
         [ H.p
@@ -200,24 +246,37 @@ viewGameHeader model =
                         []
                     )
                 , Css.fontSize (px 24)
+                , Css.marginRight Css.auto
                 ]
             ]
             [ H.text "tichu" ]
+        , H.select
+            [ E.onInput ChangeActivePlayer ]
+          <|
+            List.map
+                (\player ->
+                    H.option
+                        [ A.selected (model.activePlayer == Just player)
+                        ]
+                        [ H.text (Players.get player model.currentPlayers).name ]
+                )
+                [ North, South, East, West ]
+        , Design.button.secondary "Rewind" Rewind []
         , Design.button.secondary "Shuffle" Shuffle []
         ]
 
 
-viewTable : Model -> Tichu.Game -> Maybe Player -> Html Msg
-viewTable model game currentPlayer =
+viewTable : Model -> Tichu.Game -> Html Msg
+viewTable model game =
     let
         playersInfo =
             Tichu.getPlayersInfo game
 
         currentPlayerInfo =
-            Maybe.map (\p -> Players.get p playersInfo) currentPlayer
+            Maybe.map (\p -> Players.get p playersInfo) model.activePlayer
 
         order =
-            case currentPlayer of
+            case model.activePlayer of
                 Just p ->
                     { top = Players.partner p
                     , left = Players.left p
@@ -297,7 +356,7 @@ viewTable model game currentPlayer =
                 , Css.padding Design.spacing.small
                 ]
             ]
-            [ case currentPlayer of
+            [ case model.activePlayer of
                 Just current ->
                     let
                         info =
@@ -342,7 +401,7 @@ viewTable model game currentPlayer =
             [ css
                 [ Css.property "grid-area" "me" ]
             ]
-            [ case currentPlayer of
+            [ case model.activePlayer of
                 Just p ->
                     viewPlayer model (Players.get p playersInfo)
 
